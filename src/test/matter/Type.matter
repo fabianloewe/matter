@@ -1,0 +1,79 @@
+Type < Matter:
+  Content:
+    attributes  = [ Attributes ]
+    variables   = [ Variables ]
+    methods     = [ Methods ]
+    signals     = [ Signals ]
+
+  Behavior:
+    in elements.Behavior lookup:
+      Expressions.Assignment
+      Expressions.ForLoop
+      Expressions.If
+
+  Attributes < Matter:
+    Content:
+      attributes: { AttributeLiteral }+
+    Behavior:
+      outer.attributes = attributes
+
+  Variables < Matter:
+    Content:
+      variables = { VariableDeclaration }+
+    Behavior:
+      variables.append x
+      for var in variables:
+        var.name += "-variable"
+      outer.variables = variables
+
+  Variables:
+    id: Int
+
+  Methods < Matter:
+    Content:
+      methods = { MethodDefinition }+
+    Behavior:
+      outer.methods = methods
+
+  Signals < Matter:
+    Content:
+      signals = { SignalDeclaration }+
+    Behavior:
+      outer.signals = signals
+
+Class < Type:
+  Content:
+    [ Generics ]
+    [ Traits ]
+    Type.Content
+  Behavior:
+    Type.Behavior
+
+    create generics: Array of TypeAlias
+
+  Attributes:
+    @compiler
+    @runtime
+  Variables:
+    id: Int
+
+  Generics < Matter:
+    Content:
+      generics = { TypeAlias }+
+    Behavior:
+      outer.generics = generics
+
+    Traits < Matter:
+      Content:
+        traits = { Trait }+
+      Behavior:
+        outer.traits = traits
+
+Array < Class:
+  Generics:
+    T ~ Type
+  Variables:
+    buffer: Pointer
+    size: Int
+  Methods:
+    construct -> Array<T>:

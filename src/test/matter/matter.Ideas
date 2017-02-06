@@ -1,0 +1,16 @@
+Matter:
+    Content:
+        Defines in EBNF what is part of this matter
+
+    Behavior:
+        Defines instructions that are executed once the content definition is matched.
+        Possibly instructions: (EBNF)
+        - create variable = "create" , variable , : , type , [ "of", other type ] ;
+            Creates a new variable for this matter. The 'type' and 'other type' don't have to be known at this moment
+            but they must be available in further checks.
+        - assign variable = ([ "outer" , "." ] , matter variable) | temp variable , "=" , other variable
+            Assigns 'other variable' to 'matter variable' so the matter variable must already be created in 'Behavior' before or
+            exist in the parent Matter definition. Otherwise a temporary variable is created which isn't available outside this 'Behavior'
+            and has the same type like the assigned one. The other variable must be defined inside 'Content'.
+        - use matter = "use", matter ;
+            Virtually pastes the contents of matter to the position of the "use" expression
