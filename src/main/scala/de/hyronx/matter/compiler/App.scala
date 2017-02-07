@@ -14,7 +14,7 @@ object HelloWorld extends App {
         case Left(LexerError(msg)) ⇒ println("Lexer failed: " + msg)
         case Right(result) ⇒
           println(s"Tokens: ${result}")
-        //println(Parser(result))
+          println(Parser(result))
       }
     } catch {
       case e: java.io.FileNotFoundException ⇒ println(e.getMessage)

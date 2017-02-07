@@ -87,7 +87,7 @@ object PseudoContainer {
 
 case class Container private (
   val id: String,
-  val content: Map[String, ContentAST],
+  val content: Types.ContentMap,
   val behavior: List[AST],
   val ancestor: ContainerTree,
   val parent: ContainerTree,
@@ -98,7 +98,7 @@ case class Container private (
 object Container {
   def apply(
     id: String,
-    content: Map[String, ContentAST],
+    content: Types.ContentMap,
     behavior: List[AST],
     ancestor: ContainerTree,
     parent: ContainerTree
