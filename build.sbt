@@ -35,7 +35,8 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.0" % "test",
   "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
 
-  "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
+  //"org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
+  "com.lihaoyi" %% "fastparse" % "0.4.2"
 )
 
 scalacOptions ++= Seq(

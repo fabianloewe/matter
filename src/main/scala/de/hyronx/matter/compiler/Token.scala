@@ -11,6 +11,7 @@ case class CHAR_UPPER(character: String) extends Token
 case class CHAR_NUM(character: String) extends Token
 
 case class INDENTATION(spaces: Int) extends Token
+case object WHITESPACE extends Token
 case object ENDLINE extends Token
 case object COLON extends Token
 case object DOT extends Token

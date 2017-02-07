@@ -64,7 +64,7 @@ object Parser extends ContentParser with BehaviorParser {
         val container = for {
           content ← possibleContent flatMap {
             case content ~ _ ⇒ Some(content.content)
-          } orElse Some(Map.empty[String, ContentAST])
+          } orElse Some(Map.empty[String, Types.Definitions])
 
           behavior ← possibleBehavior flatMap {
             case behavior ~ _ ⇒ Some(behavior)
@@ -97,11 +97,7 @@ object Parser extends ContentParser with BehaviorParser {
           case _ ~ id ⇒
             createDescendant(id, parent)
         } |
-          // TODO: Find a better way! Double searching can't be the best solution
-          openContainer ^? (
-            { case id if container.find(id).isDefined ⇒ container.find(id).get },
-            id ⇒ s"Container $id is not defined and can not be opened yet"
-          )
+          openContainer >> { id ⇒ Executer(id, parent) }
 
       case None ⇒
         err(s"Container $id is not defined and can not be extended yet")

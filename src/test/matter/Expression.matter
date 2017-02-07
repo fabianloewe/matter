@@ -4,18 +4,14 @@ Base:
       syntax = Syntax
     Behavior:
       on lookup -> lookup Syntax
-
     Syntax < Matter:
       Content:
         header = [ Header ]
         body   = [ Body ]
       Behavior:
         on lookup -> lookup Header
-
       Header  = Matter.Content
-
       Body    = Matter.Content
-
   ForStatement < Statement:
     Syntax:
       Header:

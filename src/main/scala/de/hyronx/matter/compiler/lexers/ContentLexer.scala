@@ -3,25 +3,22 @@ package de.hyronx.matter.compiler.lexers
 import de.hyronx.matter.compiler.tokens._
 
 trait ContentLexer extends BaseLexer {
-  def leftParenthesis = "(" ^^ (_ ⇒ PARENTHESIS_LEFT)
-  def rightParenthesis = ")" ^^ (_ ⇒ PARENTHESIS_RIGHT)
-  def leftCurlyBracket = "{" ^^ (_ ⇒ CURLY_BRACKET_LEFT)
-  def rightCurlyBracket = "}" ^^ (_ ⇒ CURLY_BRACKET_RIGHT)
-  def leftSquareBracket = "[" ^^ (_ ⇒ SQUARE_BRACKET_LEFT)
-  def rightSquareBracket = "]" ^^ (_ ⇒ SQUARE_BRACKET_RIGHT)
-  def asterisk = "*" ^^ (_ ⇒ ASTERISK)
-  def plus = "+" ^^ (_ ⇒ PLUS)
-  def space = " " ^^ (_ ⇒ SPACE)
-  def dash = "-" ^^ (_ ⇒ DASH)
+  import fastparse.noApi._
+  import whitespace._
 
-  def char: Parser[Token] = {
-    val charLowerCase = "[a-z]".r ^^ { ch ⇒ CHAR_LOWER(ch) }
-    val charUpperCase = "[A-Z]".r ^^ { ch ⇒ CHAR_UPPER(ch) }
-    val charNumber = "[0-9]".r ^^ { ch ⇒ CHAR_NUM(ch) }
-    charLowerCase | charUpperCase | charNumber
-  }
+  def leftParenthesis = P("(") map (_ ⇒ PARENTHESIS_LEFT)
+  def rightParenthesis = P(")") map (_ ⇒ PARENTHESIS_RIGHT)
+  def leftCurlyBracket = P("{") map (_ ⇒ CURLY_BRACKET_LEFT)
+  def rightCurlyBracket = P("}") map (_ ⇒ CURLY_BRACKET_RIGHT)
+  def leftSquareBracket = P("[") map (_ ⇒ SQUARE_BRACKET_LEFT)
+  def rightSquareBracket = P("]") map (_ ⇒ SQUARE_BRACKET_RIGHT)
 
-  def content: Parser[Token] = {
+  def asterisk = P("*") map (_ ⇒ ASTERISK)
+  def plus = P("+") map (_ ⇒ PLUS)
+  def space = P(" ") map (_ ⇒ SPACE)
+  def dash = P("-") map (_ ⇒ DASH)
+
+  def content: P[Token] = {
     leftParenthesis | rightParenthesis |
       leftCurlyBracket | rightCurlyBracket |
       leftSquareBracket | rightSquareBracket |
