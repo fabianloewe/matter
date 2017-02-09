@@ -10,11 +10,9 @@ object HelloWorld extends App {
   for (arg ← args) {
     try {
       val code = Source.fromFile(arg).mkString
-      Lexer(code) match {
-        case Left(LexerError(msg)) ⇒ println("Lexer failed: " + msg)
-        case Right(result) ⇒
-          println(s"Tokens: ${result}")
-          println(Parser(result))
+      Parser(code) match {
+        case Left(ParserError(msg)) ⇒ println("Parser failed: " + msg)
+        case Right(result)          ⇒ println(result)
       }
     } catch {
       case e: java.io.FileNotFoundException ⇒ println(e.getMessage)

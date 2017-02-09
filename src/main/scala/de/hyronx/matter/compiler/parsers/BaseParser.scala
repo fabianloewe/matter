@@ -2,64 +2,75 @@ package de.hyronx.matter.compiler.parsers
 
 import scala.collection.mutable.ListBuffer
 
-import fastparse.core.{ ParserApi }
+import de.hyronx.matter.compiler.ast._
 
-import de.hyronx.matter.compiler.tokens._
-import de.hyronx.matter.compiler.ast.{
-  AST,
-  Identifier,
-  Container,
-  BaseContainer
-}
+trait BaseParser {
+  // Whitespace definition
+  val ws = " "
+  // New line
+  val nl = "\n"
+  val ignoreWhitespaces = fastparse.WhitespaceApi.Wrapper {
+    import fastparse.all._
+    NoTrace(ws.rep(1))
+  }
+  import fastparse.all._
 
-class BaseParser extends fastparse.Api[Token, List[Token]](
-  implicitly, TokenSetHelper, TokenReprOps, List.ordering
-) {
-  implicit def parserApi[T, V](p: T)(
-    implicit
-    c: T ⇒ core.Parser[V, Token, List[Token]]
-  ): ParserApi[V, Token, List[Token]] = new FastparseAPI[V](p)
+  class Indentation(val indent: Int = 0) {
+    val same = P(nl.rep(1) ~ ws.rep(exactly = indent).!).log() map { x ⇒
+      println(s"Same indent: ${x.length}")
+      this
+    }
+    val deeper = P(nl ~ ws.rep(exactly = indent + 2).!).log() map { x ⇒
+      println(s"Deeper indent: ${x.length}")
+      Indentation(x.length)
+    }
+    def upper(repeat: Int = 1) = P(nl ~ ws.rep(max = indent - 2).!).log() map { x ⇒
+      println(s"Upper indent: ${x.length}")
+      Indentation(x.length)
+    }
+  }
+  object Indentation {
+    def apply(indent: Int) = new Indentation(indent)
+    def apply(indent: Indentation) = new Indentation(indent.indent + 2)
+    def apply(parent: ContainerTree, indent: Int = 0): Indentation = {
+      if (parent.parent != parent) {
+        Indentation(parent.parent, indent + 2)
+      } else {
+        new Indentation(indent)
+      }
+    }
 
-  def identifier: P[Identifier] = {
-    P(IDENTIFIER ~ (DOT ~ IDENTIFIER).rep) map { (first, list) ⇒
-      val result = first :: (list map { case _ ~ Identifier(next, _) ⇒ next })
-      Identifier(result.last, result.dropRight(1))
+    val count: P[Indentation] = {
+      P("\n" ~ ws.rep.!).map { x ⇒ Indentation(x.length) }
+    }
+  }
+  def deeper(indent: Option[Indentation], parent: ContainerTree) = {
+    indent.getOrElse(Indentation(parent)).deeper map { x ⇒
+      println(s"Deeper indent: ${x.indent}")
+      x
     }
   }
 
-  def newContainer: P[Identifier] = {
-    simpleIdentifier ~ LESSTHAN ~ identifier ~ COLON map {
-      case Identifier(name, _) ~ _ ~ Identifier(parent, rest) ~ _ ⇒
-        Identifier(name, rest :+ parent)
+  def same(indent: Option[Indentation], parent: ContainerTree) = {
+    indent.getOrElse(Indentation(parent)).same map { x ⇒
+      println(s"Same indent: ${x.indent}")
+      x
     }
   }
 
-  def openContainer: Parser[Identifier] = {
-    log(identifier ~ COLON)("Open container") map {
-      case id ~ _ ⇒ id
+  val letter = P(lowercase | uppercase)
+  val lowercase = P(CharIn('a' to 'z'))
+  val uppercase = P(CharIn('A' to 'Z'))
+  val digit = P(CharIn('0' to '9'))
+
+  val variable = P(lowercase ~ (lowercase | digit | "-").rep).!
+  val identifier = P(uppercase ~ (letter | digit | "-").rep).!
+  val literal = P("\"" ~/ CharsWhile(_ != "\"").!)
+  val number = P(digit.rep(1)).!.map(_.toInt)
+
+  val scopedIdentifier: P[Identifier] = {
+    P(identifier.!.rep(min = 1, sep = ".")) map { seq ⇒
+      Identifier(seq.last, seq.dropRight(1).toList)
     }
   }
-
-  def assignContainer: Parser[Identifier] = {
-    simpleIdentifier ~ ASSIGN ~ identifier map {
-      case Identifier(name, _) ~ _ ~ Identifier(assignee, rest) ⇒
-        Identifier(name, rest :+ assignee)
-    }
-  }
-
-  /*def processIndents(
-    list: List[(Container, List[Token])],
-    indentLevel: Int = 0
-  ): List[(Container, Int)] = list.headOption match {
-    case Some((container, dents)) ⇒
-      println(s"Current indentLevel: $indentLevel for: $container")
-      val (indents, dedents) = dents.partition(_ == INDENT)
-      println(s"Indents: ${indents.size}, Dedents: ${dedents.size}\n")
-      var nextIndentLevel = indentLevel + indents.size - dedents.size
-      if (container.body.nonEmpty)
-        nextIndentLevel = nextIndentLevel + 1
-
-      (container, indentLevel) :: processIndents(list.tail, nextIndentLevel)
-    case None ⇒ List()
-  }*/
 }

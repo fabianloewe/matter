@@ -1,81 +1,55 @@
 package de.hyronx.matter.compiler.parsers
 
-import de.hyronx.matter.compiler.tokens._
 import de.hyronx.matter.compiler.ast._
+import de.hyronx.matter.compiler.ast.Types.Definitions
 
 trait ContentParser extends BaseParser {
-  def range: Parser[Range] = {
-    def charLowerCase: Parser[CHAR_LOWER] = {
-      accept("lowercase character", { case ch @ CHAR_LOWER(_) ⇒ ch })
+  import fastparse.all._
+
+  val range: P[Range] = {
+    val rangeLowerCase = P(lowercase.! ~ "-" ~ lowercase.!) map {
+      case (from, to) ⇒
+        Range(from, to)
     }
-    def charUpperCase: Parser[CHAR_UPPER] = {
-      accept("uppercase character", { case ch @ CHAR_UPPER(_) ⇒ ch })
+    val rangeUpperCase = P(uppercase.! ~ "-" ~ uppercase.!) map {
+      case (from, to) ⇒
+        Range(from, to)
     }
-    def charNumber: Parser[CHAR_NUM] = {
-      accept("numerical character", { case ch @ CHAR_NUM(_) ⇒ ch })
+    val rangeNumber = P(number.! ~ "-" ~ number.!) map {
+      case (from, to) ⇒
+        Range(from.toString, to.toString)
     }
 
-    val rangeLowerCase = charLowerCase ~ DASH ~ charLowerCase ^^ {
-      case CHAR_LOWER(from) ~ _ ~ CHAR_LOWER(to) ⇒ Range(from, to)
-    }
-    val rangeUpperCase = charUpperCase ~ DASH ~ charUpperCase ^^ {
-      case CHAR_UPPER(from) ~ _ ~ CHAR_UPPER(to) ⇒ Range(from, to)
-    }
-    val rangeNumber = charNumber ~ DASH ~ charNumber ^^ {
-      case CHAR_NUM(from) ~ _ ~ CHAR_NUM(to) ⇒ Range(from, to)
-    }
-
-    rangeLowerCase | rangeUpperCase | rangeNumber
+    P(rangeLowerCase | rangeUpperCase | rangeNumber)
   }
 
-  def repeat: Parser[Repeat] = {
-    CURLY_BRACKET_LEFT ~ definitions ~ CURLY_BRACKET_RIGHT ~ ASTERISK ^^ {
-      case _ ~ defs ~ _ ~ _ ⇒ Repeat(defs)
+  val end = P(ws | nl)
+  val literalAST = P(literal) map (Literal)
+  val repeat = P("{" ~/ ws ~ definitions ~ ws ~ "}*") map (Repeat)
+  val repeatOne = P("{" ~/ ws ~ definitions ~ ws ~ "}+") map (RepeatOne)
+  val optional = P("[" ~/ ws ~ definitions ~ ws ~ "]") map (Optional)
+  val group = P("(" ~/ ws ~ definitions ~ ws ~ ")") map (Group)
+
+  private val definitions: P[Definitions] = {
+    P(repeat | repeatOne | optional | group |
+      range | scopedIdentifier | literalAST).rep(min = 1, sep = ws).log()
+  }
+
+  def content(indent: Indentation): P[Content] = {
+    P(variable ~ ws.rep(1) ~ "=" ~/ ws ~ definitions).rep(min = 1, sep = indent.same).log() map { result ⇒
+      //val result = seq map { case (newVar, defs, _) ⇒ (newVar, defs) }
+      Content(result.toMap[String, Definitions])
     }
-  }
-
-  def repeatOne: Parser[RepeatOne] = {
-    CURLY_BRACKET_LEFT ~ definitions ~ CURLY_BRACKET_RIGHT ~ PLUS ^^ {
-      case _ ~ defs ~ _ ~ _ ⇒ RepeatOne(defs)
-    }
-  }
-
-  def option: Parser[Option] = {
-    SQUARE_BRACKET_LEFT ~ definitions ~ SQUARE_BRACKET_RIGHT ^^ {
-      case _ ~ defs ~ _ ⇒ Option(defs)
-    }
-  }
-
-  def group: Parser[Group] = {
-    PARENTHESIS_LEFT ~ definitions ~ PARENTHESIS_RIGHT ^^ {
-      case _ ~ defs ~ _ ⇒ Group(defs)
-    }
-  }
-
-  private def all: Parser[AST] = {
-    range | repeat | repeatOne | option | group | literal | identifier
-  }
-
-  private def definitions: Parser[Definitions] = {
-    rep1(all) ^^ { list ⇒ Definitions(list) }
-  }
-
-  def content: Parser[Content] = {
-    rep1(
-      log(variable ~ ASSIGN ~ definitions)("Content variable") ^^ {
-        case VARIABLE(name) ~ _ ~ defs ⇒ (name, defs)
-      }
-    ) ^^ { list ⇒ Content(list.toMap[String, Definitions]) }
   }
 
   /*
-  def leftParenthesis = "(" ^^ (_ ⇒ PARENTHESIS_LEFT)
-  def rightParenthesis = ")" ^^ (_ ⇒ PARENTHESIS_RIGHT)
-  def leftCurlyBracket = "{" ^^ (_ ⇒ CURLY_BRACKET_LEFT)
-  def rightCurlyBracket = "}" ^^ (_ ⇒ CURLY_BRACKET_RIGHT)
-  def leftSquareBracket = "[" ^^ (_ ⇒ SQUARE_BRACKET_LEFT)
-  def rightSquareBracket = "]" ^^ (_ ⇒ SQUARE_BRACKET_RIGHT)
-  def asterisk = "*" ^^ (_ ⇒ ASTERISK)
-  def plus = "+" ^^ (_ ⇒ PLUS)
+  def leftParenthesis = "(" map (_ ⇒ PARENTHESIS_LEFT)
+  def rightParenthesis = ")" map (_ ⇒ PARENTHESIS_RIGHT)
+  def leftCurlyBracket = "{" map (_ ⇒ CURLY_BRACKET_LEFT)
+  def rightCurlyBracket = "}" map (_ ⇒ CURLY_BRACKET_RIGHT)
+  def leftSquareBracket = "[" map (_ ⇒ SQUARE_BRACKET_LEFT)
+  def rightSquareBracket = "]" map (_ ⇒ SQUARE_BRACKET_RIGHT)
+  def asterisk = "*" map (_ ⇒ ASTERISK)
+  def plus = "+" map (_ ⇒ PLUS)
   */
 }

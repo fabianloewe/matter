@@ -13,10 +13,10 @@ sealed trait ContainerTree extends AST {
   def equals(that: String) = this.id == that
 
   def find(id: Identifier): scala.Option[ContainerTree] = {
-    println(s"Searching in ${this.id}")
+    println(s"* Searching in ${this.id} for ${id.name}")
     id.family.headOption match {
       case Some(idHead) ⇒
-        println(s"Search with family head $idHead")
+        //println(s"Search with family head $idHead")
         if (this.id == idHead) {
           find(Identifier(id.name, id.family.tail))
         } else {
@@ -25,10 +25,10 @@ sealed trait ContainerTree extends AST {
               // Try to find the next part of id.family
               container.find(Identifier(id.name, id.family.tail))
             case None ⇒
-              println("  Is not a child")
+              println("* Is not a child")
               // Check if there is no ancestor left
               if (this.ancestor == this) {
-                println("    No ancestor left")
+                println(s"* Fail! Current: ${this.id}")
                 None
               } else {
                 this.ancestor.find(id)
@@ -36,22 +36,32 @@ sealed trait ContainerTree extends AST {
           }
         }
       case None ⇒
-        println(s"No family head, searching for ${id.name}")
+        //println("* No family head")
         if (this.id == id.name) {
           Some(this)
         } else {
-          println(s"  Children: ${this.children map (_.id)}")
+          println(s"* This children: ${this.children map (_.id)}")
           this.children.find(_.id == id.name) match {
             case Some(container) ⇒
-              println(s"    Container found: $container")
+              println(s"* Container found in children")
               // There is no family defined so this must be the wanted container
               Some(container)
             case None ⇒
-              // Check if there is no ancestor left
-              if (this.ancestor == this)
-                None
-              else
-                this.ancestor.find(id)
+              // Check if a sibling with this name is defined
+              println(s"* Parent children: ${parent.children map (_.id)}")
+              parent.children.find(_.id == id.name) match {
+                case Some(container) ⇒
+                  println("* Container found in parent")
+                  Some(container)
+                case None ⇒
+                  // Check if there is no ancestor left
+                  if (this.ancestor == this) {
+                    println(s"* Fail! Current: ${this.id}")
+                    None
+                  } else {
+                    this.ancestor.find(id)
+                  }
+              }
           }
         }
     }
@@ -82,7 +92,12 @@ object PseudoContainer {
     ancestor: ContainerTree,
     parent: ContainerTree,
     children: ListBuffer[ContainerTree] = ListBuffer()
-  ): PseudoContainer = new PseudoContainer(id, ancestor, parent, ListBuffer(), children)
+  ): PseudoContainer = {
+    val container = new PseudoContainer(id, ancestor, parent, ListBuffer(), children)
+    ancestor.descendants += container
+    parent.children += container
+    container
+  }
 }
 
 case class Container private (
@@ -101,9 +116,10 @@ object Container {
     content: Types.ContentMap,
     behavior: List[AST],
     ancestor: ContainerTree,
-    parent: ContainerTree
+    parent: ContainerTree,
+    children: ListBuffer[ContainerTree] = ListBuffer()
   ): Container = {
-    val container = new Container(id, content, behavior, ancestor, parent, ListBuffer(), ListBuffer())
+    val container = new Container(id, content, behavior, ancestor, parent, ListBuffer(), children)
     ancestor.descendants += container
     parent.children += container
     container
@@ -121,7 +137,8 @@ case object MatterContainer extends ContainerTree {
 case object ContentContainer extends ContainerTree {
   val id = "Content"
   val ancestor = this
-  val descendants = ListBuffer()
+  // No descendants allowed
+  def descendants = ListBuffer()
   val parent = MatterContainer
   val children = ListBuffer()
 }
@@ -129,7 +146,8 @@ case object ContentContainer extends ContainerTree {
 case object BehaviorContainer extends ContainerTree {
   val id = "Behavior"
   val ancestor = this
-  val descendants = ListBuffer()
+  // No descendants allowed
+  def descendants = ListBuffer()
   val parent = MatterContainer
   val children = ListBuffer()
 }

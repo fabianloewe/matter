@@ -1,39 +1,33 @@
 package de.hyronx.matter.compiler.parsers
 
-import de.hyronx.matter.compiler.tokens._
 import de.hyronx.matter.compiler.ast._
 
 trait BehaviorParser extends BaseParser {
-  def onCommand: Parser[OnCommand] = {
-    log(ON ~ LOOKUP ~ ARROW_LEFT ~ lookup)("on <command>") ^^ {
-      case _ ~ _ ~ _ ~ op ⇒ OnCommand("lookup", op)
+  import fastparse.noApi._
+  import ignoreWhitespaces._
+
+  val onCommand = {
+    P("on" ~/ variable ~ "->" ~ operations) map {
+      case (newVar, command) ⇒
+        OnCommand(newVar, command)
     }
   }
 
-  def lookupOne: Parser[Lookup] = {
-    LOOKUP ~ identifier ^^ {
-      case _ ~ id ⇒ Lookup(id)
+  val lookupOne = P("lookup" ~/ scopedIdentifier) map { id ⇒ Lookup(id) }
+
+  val lookupList = {
+    P("lookup:" ~/ Indentation.count ~ scopedIdentifier.rep(1)) map {
+      case (_, seq) ⇒ LookupList(seq.toList)
     }
   }
 
-  def lookupList: Parser[LookupList] = {
-    LOOKUP ~ COLON ~ INDENT ~ rep1(identifier) ^^ {
-      case _ ~ _ ~ _ ~ list ⇒
-        LookupList(list)
-    }
+  val lookup: P[AST] = lookupOne | lookupList
+
+  private val operations: P[AST] = onCommand | lookup
+
+  val inDo = P("in" ~/ scopedIdentifier ~ operations) map {
+    case (id, op) ⇒ InDo(id, op)
   }
 
-  def lookup: Parser[AST] = lookupOne | lookupList
-
-  private def operations: Parser[AST] = onCommand | lookup
-
-  def inDo: Parser[InDo] = {
-    IN ~ identifier ~ operations ^^ {
-      case _ ~ id ~ op ⇒ InDo(id, op)
-    }
-  }
-
-  def behavior: Parser[List[AST]] = {
-    rep1(inDo | operations) ^^ (list ⇒ list)
-  }
+  val behavior: P[Seq[AST]] = (inDo | operations).rep.log()
 }

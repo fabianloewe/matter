@@ -2,105 +2,144 @@ package de.hyronx.matter.compiler
 
 import scala.collection.mutable.ListBuffer
 
-import de.hyronx.matter.compiler.tokens._
 import de.hyronx.matter.compiler.ast._
 import de.hyronx.matter.compiler.parsers._
 
 object Parser extends ContentParser with BehaviorParser {
-  def defineContent: Parser[Content] = {
-    openContainer ~ INDENT ~ content ^^ {
-      case Identifier(name, family) ~ _ ~ cont if name == "Content" ⇒
-        cont
-    }
+  import fastparse.all._
+
+  def apply(
+    code: String
+  ): Either[ParserError, ContainerTree] = program.parse(code) match {
+    case fail: Parsed.Failure      ⇒ Left(ParserError(s"${fail.lastParser}"))
+    case Parsed.Success(result, _) ⇒ Right(result)
   }
 
-  def defineBehavior: Parser[List[AST]] = {
-    log(openContainer ~ INDENT ~ behavior)("Testing behavior") ^^ {
-      case Identifier(name, family) ~ _ ~ behav if name == "Behavior" ⇒
-        behav
-    }
-  }
-
-  def program: Parser[ContainerTree] = {
-    openContainer ~ rep(INDENT ~ openContainer) ~ INDENT >> {
-      case first ~ list ~ _ ⇒
-        val id: Identifier = list.map {
-          case _ ~ container ⇒ container
-        }.foldLeft(first) { (x, y) ⇒
-          Identifier(y.name, x.family ::: x.name :: y.family)
+  val program: P[ContainerTree] = {
+    // Multiple layers of containers may be opened
+    // before the first one is newly defined.
+    def openContainers(
+      parent: ContainerTree = BaseContainer,
+      indent: Indentation = Indentation(0)
+    ): P[(ContainerTree, Indentation)] = {
+      openContainer(parent, indent) flatMap { next ⇒
+        println(s"Indent after openContainer: ${indent.indent}")
+        openContainers(next, Indentation(indent)).? map {
+          case Some((container, newIndent)) ⇒ (container, newIndent)
+          case None                         ⇒ (next, indent)
         }
-
-        BaseContainer.find(id) match {
-          case Some(container) ⇒
-            rep(createContainer(container)) ^^ { list ⇒
-              list foreach { element ⇒ BaseContainer.children += element }
-              BaseContainer
-            }
-          case None ⇒
-            err(s"Container $id is not defined yet")
-        }
-    }
-  }
-
-  def createContainer(parent: ContainerTree): Parser[ContainerTree] = {
-    newContainer ~ INDENT >> {
-      case id ~ _ ⇒
-        if (id.family.head == "Matter") {
-          createMatter(id.name, parent) >> { initialized ⇒
-            createContainer(initialized)
-          }
-        } else {
-          createDescendant(id, parent)
-        }
-    } |
-      assignContainer >> { id ⇒
-        createDescendant(id, parent)
       }
-  }
+    }
 
-  def createMatter(name: String, parent: ContainerTree): Parser[Container] = {
-    log(opt(defineContent ~ DEDENT) ~ opt(defineBehavior ~ DEDENT))("Create Matter") ^^ {
-      case possibleContent ~ possibleBehavior ⇒
-        val container = for {
-          content ← possibleContent flatMap {
-            case content ~ _ ⇒ Some(content.content)
-          } orElse Some(Map.empty[String, Types.Definitions])
-
-          behavior ← possibleBehavior flatMap {
-            case behavior ~ _ ⇒ Some(behavior)
-          } orElse Some(List.empty[AST])
-
-        } yield Container(name, content, behavior, MatterContainer, parent)
-
-        // yield returns an Option[Container] even though all options are catched
-        container.get
+    openContainers() flatMap {
+      case (parent, indent) ⇒
+        (newContainer(parent, indent) | assignContainer(parent, indent)).rep(1) map { seq ⇒
+          parent.children ++= seq
+          parent
+        }
     }
   }
 
-  def createDescendant(id: Identifier, parent: ContainerTree): Parser[ContainerTree] = {
-    val possibleContainer = {
-      parent.find(Identifier(id.family.last, id.family.dropRight(1))) match {
-        case Some(ancestor @ Container(_, content, behavior, _, _, _, _)) ⇒
-          Some(Container(id.name, content, behavior, ancestor, parent))
-        case Some(container) ⇒
-          Some(PseudoContainer(id.name, container.ancestor, parent, container.children))
+  // @param indent  Indentation of the header of the new container
+  def newContainer(
+    parent: ContainerTree,
+    indent: Indentation
+  ): P[ContainerTree] = {
+    P(identifier ~ " < " ~/ scopedIdentifier ~ ":" ~ indent.deeper).log() map {
+      case (id, scoped: Identifier, _) ⇒
+        println(s"Parent: $scoped")
+        parent.find(scoped) match {
+          case Some(MatterContainer) ⇒
+            id
+          case Some(ancestor @ Container(_, content, behavior, _, _, _, _)) ⇒
+            Container(id, content, behavior, ancestor, parent)
+          case Some(ancestor) ⇒
+            PseudoContainer(id, ancestor, parent)
+          case None ⇒
+            None
+        }
+    } flatMap {
+      case id: String ⇒
+        newMatter(id, parent, indent)
+      case container: ContainerTree ⇒
+        val deeperIndent = Indentation(indent)
+        P(newContainer(container, deeperIndent) |
+          openContainer(container, deeperIndent) |
+          assignContainer(container, deeperIndent))
+      case None ⇒
+        Fail
+    }
+  }
+
+  // @param indent  Indentation of the header of the new Matter container
+  def newMatter(
+    id: String,
+    parent: ContainerTree,
+    indent: Indentation
+  ): P[ContainerTree] = {
+    val bodyIndent = Indentation(indent)
+    def expected(id: String) = P(id ~ ":" ~/ bodyIndent.deeper)
+    val newContent = expected("Content") flatMap { _ ⇒
+      P(content(Indentation(bodyIndent)).log() ~/ bodyIndent.same) map { case (con, _) ⇒ con.content }
+    }
+    val newBehavior = expected("Behavior").log() flatMap { _ ⇒
+      P(behavior ~/ bodyIndent.same) map { case (beh, _) ⇒ beh }
+    }
+
+    P(newContent.? ~ newBehavior.?).log() map {
+      case (Some(content), Some(behavior)) ⇒
+        Container(id, content, behavior.toList, MatterContainer, parent)
+      case (_, _) ⇒
+        PseudoContainer(id, MatterContainer, parent)
+    } flatMap { container ⇒
+      val deeperIndent = Indentation(indent)
+      P(newContainer(container, deeperIndent) |
+        openContainer(container, deeperIndent) |
+        assignContainer(container, deeperIndent))
+    }
+  }
+
+  // @param indent  Indentation of the header of the opened container
+  def openContainer[T, V](
+    parent: ContainerTree,
+    indent: Indentation
+  ): P[ContainerTree] = {
+    P(scopedIdentifier ~ ":" ~/ indent.deeper).log() map {
+      case (scoped, _) ⇒ parent.find(scoped)
+    } flatMap {
+      case Some(container) ⇒
+        val deeperIndent = Indentation(indent)
+        P(newContainer(container, deeperIndent) |
+          openContainer(container, deeperIndent) |
+          assignContainer(container, deeperIndent) /*|
+          Executer(container) map { _ ⇒ parent }*/ )
+      case None ⇒
+        Fail
+    }
+  }
+
+  def assignContainer(
+    parent: ContainerTree,
+    indent: Indentation
+  ): P[ContainerTree] = {
+    P(identifier ~ ws.rep(1) ~ "=" ~/ ws ~ scopedIdentifier ~
+      (indent.same | indent.upper())).log() map {
+      case (id, scoped: Identifier, newIndent) ⇒ parent.find(scoped) match {
+        case Some(Container(_, content, behavior, ancestor, parent, _, children)) ⇒
+          Some((Container(id, content, behavior, ancestor, parent, children), newIndent))
+        case Some(twin) ⇒
+          println(s"! assignContainer twin: ${twin.id}, parent: ${parent.id}")
+          Some((PseudoContainer(id, twin.ancestor, parent, twin.children), newIndent))
         case None ⇒
           None
       }
-    }
-
-    possibleContainer match {
-      case Some(container) ⇒
-        opt(INDENT) ~ (newContainer | assignContainer) >> {
-          case Some(INDENT) ~ id ⇒
-            createDescendant(id, container)
-          case _ ~ id ⇒
-            createDescendant(id, parent)
-        } |
-          openContainer >> { id ⇒ Executer(id, parent) }
-
+    } flatMap {
+      case Some((_, newIndent)) ⇒
+        P(newContainer(parent, newIndent) |
+          openContainer(parent, newIndent) |
+          assignContainer(parent, newIndent))
       case None ⇒
-        err(s"Container $id is not defined and can not be extended yet")
+        Fail
     }
   }
 
@@ -131,16 +170,4 @@ object Parser extends ContentParser with BehaviorParser {
           }.head
       }
   }*/
-
-  def apply(
-    tokens: Seq[Token]
-  ): Either[ParserError, AST] = {
-    val reader = new TokenReader(tokens)
-    program(reader) match {
-      case NoSuccess(msg, next) ⇒ Left(ParserError(msg + s" at ${next.first}"))
-      case Success(result, next) ⇒
-        println(s"Children: ${result.children.map(_.id)}")
-        Right(result)
-    }
-  }
 }
