@@ -1,18 +1,23 @@
-Base:
-  Statement < Matter:
+Statement < Matter:
+  Content:
+    syntax = Syntax
+  Behavior:
+    on lookup -> lookup Syntax
+
+  Syntax < Matter:
     Content:
-      syntax = Syntax
+      header = Header
+      body   = [ Body ]
     Behavior:
-      on lookup -> lookup Syntax
-    Syntax < Matter:
-      Content:
-        header = [ Header ]
-        body   = [ Body ]
-      Behavior:
-        on lookup -> lookup Header
-      Header  = Matter.Content
-      Body    = Matter.Content
-  ForStatement < Statement:
-    Syntax:
-      Header:
-        tuple = "for" Variable "in" Variable
+      on lookup -> lookup Header
+
+    Header = Matter.Content
+    Body = Matter.Content
+
+Variable < Matter:
+  Content:
+    name = a-z0-9
+
+ForStatement < Statement:
+  Syntax.Header:
+    tuple = "for" Variable "in" Variable

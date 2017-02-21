@@ -1,0 +1,41 @@
+package de.hyronx.matter.compiler
+
+import de.hyronx.matter.compiler.parsers.BaseParser
+import de.hyronx.matter.compiler.types.Type
+import de.hyronx.matter.compiler.ast._
+
+object Executer extends BaseParser {
+  import fastparse.all._
+
+  def generate(
+    openContainer: ContainerTree
+  ): List[(String, P[Any])] = openContainer match {
+    case container: Container ⇒
+      generateParser(container, container.content)
+    case pseudo: PseudoContainer ⇒
+      generate(pseudo.ancestor)
+    case container ⇒
+      generate(container)
+  }
+
+  def generateParser(
+    container: Container,
+    content: Types.ContentMap
+  ): List[(String, P[Any])] = {
+    content.headOption match {
+      case Some((variable, ast)) ⇒
+        (variable, ParserGenerator(ast)) :: generateParser(container, content.tail)
+      case None ⇒
+        List()
+    }
+  }
+
+  def apply(parent: ContainerTree) = {
+    generate(parent) map {
+      case (variable, parser) ⇒
+        parser
+    } reduceLeft (_ ~ _)
+
+  }
+
+}

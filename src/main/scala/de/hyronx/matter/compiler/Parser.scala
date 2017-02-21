@@ -10,7 +10,7 @@ object Parser extends ContentParser with BehaviorParser {
 
   def apply(
     code: String
-  ): Either[ParserError, ContainerTree] = program.parse(code) match {
+  ): Either[ParserError, ContainerTree] = BaseContainer.parser.parse(code) match {
     case fail: Parsed.Failure      ⇒ Left(ParserError(s"${fail.lastParser}"))
     case Parsed.Success(result, _) ⇒ Right(result)
   }
@@ -23,7 +23,6 @@ object Parser extends ContentParser with BehaviorParser {
       indent: Indentation = Indentation(0)
     ): P[(ContainerTree, Indentation)] = {
       openContainer(parent, indent) flatMap { next ⇒
-        println(s"Indent after openContainer: ${indent.indent}")
         openContainers(next, Indentation(indent)).? map {
           case Some((container, newIndent)) ⇒ (container, newIndent)
           case None                         ⇒ (next, indent)
@@ -47,25 +46,21 @@ object Parser extends ContentParser with BehaviorParser {
   ): P[ContainerTree] = {
     P(identifier ~ " < " ~/ scopedIdentifier ~ ":" ~ indent.deeper).log() map {
       case (id, scoped: Identifier, _) ⇒
-        println(s"Parent: $scoped")
-        parent.find(scoped) match {
-          case Some(MatterContainer) ⇒
-            id
-          case Some(ancestor @ Container(_, content, behavior, _, _, _, _)) ⇒
-            Container(id, content, behavior, ancestor, parent)
-          case Some(ancestor) ⇒
-            PseudoContainer(id, ancestor, parent)
-          case None ⇒
-            None
+        if (scoped.name == MatterContainer.id) {
+          id
+        } else {
+          parent.find(scoped) match {
+            case Some(ancestor @ Container(_, content, behavior, _, _, _, _)) ⇒
+              Container(id, content, behavior, ancestor, parent, ListBuffer())
+            case _ ⇒
+              None
+          }
         }
     } flatMap {
       case id: String ⇒
         newMatter(id, parent, indent)
       case container: ContainerTree ⇒
-        val deeperIndent = Indentation(indent)
-        P(newContainer(container, deeperIndent) |
-          openContainer(container, deeperIndent) |
-          assignContainer(container, deeperIndent))
+        checkChild(container, Indentation(indent))
       case None ⇒
         Fail
     }
@@ -79,23 +74,21 @@ object Parser extends ContentParser with BehaviorParser {
   ): P[ContainerTree] = {
     val bodyIndent = Indentation(indent)
     def expected(id: String) = P(id ~ ":" ~/ bodyIndent.deeper)
-    val newContent = expected("Content") flatMap { _ ⇒
-      P(content(Indentation(bodyIndent)).log() ~/ bodyIndent.same) map { case (con, _) ⇒ con.content }
+    val newContent = expected("Content").log() flatMap { _ ⇒
+      content(Indentation(bodyIndent)) map { con ⇒ con.content }
     }
-    val newBehavior = expected("Behavior").log() flatMap { _ ⇒
-      P(behavior ~/ bodyIndent.same) map { case (beh, _) ⇒ beh }
+    val newBehavior = expected("Behavior") flatMap { _ ⇒
+      behavior
     }
 
-    P(newContent.? ~ newBehavior.?).log() map {
-      case (Some(content), Some(behavior)) ⇒
+    P(newContent.? ~ (bodyIndent.same ~ newBehavior ~ bodyIndent.same.?).?).log() map {
+      case (Some(content), Some((_, behavior, _))) ⇒
         Container(id, content, behavior.toList, MatterContainer, parent)
       case (_, _) ⇒
         PseudoContainer(id, MatterContainer, parent)
     } flatMap { container ⇒
-      val deeperIndent = Indentation(indent)
-      P(newContainer(container, deeperIndent) |
-        openContainer(container, deeperIndent) |
-        assignContainer(container, deeperIndent))
+      println(s"/ New Matter defined: ${container.id} with parent: ${parent.id}")
+      checkChild(container, Indentation(indent)).log()
     }
   }
 
@@ -105,14 +98,12 @@ object Parser extends ContentParser with BehaviorParser {
     indent: Indentation
   ): P[ContainerTree] = {
     P(scopedIdentifier ~ ":" ~/ indent.deeper).log() map {
-      case (scoped, _) ⇒ parent.find(scoped)
+      case (scoped, _) ⇒ parent.find(scoped) map (_.clone)
     } flatMap {
       case Some(container) ⇒
-        val deeperIndent = Indentation(indent)
-        P(newContainer(container, deeperIndent) |
-          openContainer(container, deeperIndent) |
-          assignContainer(container, deeperIndent) /*|
-          Executer(container) map { _ ⇒ parent }*/ )
+        container.parser
+      /*case Some(container) ⇒
+        checkChild(container, Indentation(indent))*/
       case None ⇒
         Fail
     }
@@ -123,24 +114,29 @@ object Parser extends ContentParser with BehaviorParser {
     indent: Indentation
   ): P[ContainerTree] = {
     P(identifier ~ ws.rep(1) ~ "=" ~/ ws ~ scopedIdentifier ~
-      (indent.same | indent.upper())).log() map {
+      (indent.same | indent.upper())) map {
       case (id, scoped: Identifier, newIndent) ⇒ parent.find(scoped) match {
         case Some(Container(_, content, behavior, ancestor, parent, _, children)) ⇒
-          Some((Container(id, content, behavior, ancestor, parent, children), newIndent))
+          (Container(id, content, behavior, ancestor, parent, children), newIndent)
+        case Some(ContentContainer) ⇒
+          (ContentContainer(id, Indentation(indent), parent), newIndent)
         case Some(twin) ⇒
           println(s"! assignContainer twin: ${twin.id}, parent: ${parent.id}")
-          Some((PseudoContainer(id, twin.ancestor, parent, twin.children), newIndent))
+          (PseudoContainer(id, twin.ancestor, parent, twin.children), newIndent)
         case None ⇒
           None
       }
     } flatMap {
-      case Some((_, newIndent)) ⇒
-        P(newContainer(parent, newIndent) |
-          openContainer(parent, newIndent) |
-          assignContainer(parent, newIndent))
-      case None ⇒
-        Fail
+      case (_, newIndent: Indentation) ⇒ checkChild(parent, newIndent)
+      case None                        ⇒ Fail
     }
+  }
+
+  def checkChild(parent: ContainerTree, indent: Indentation) = {
+    P(newContainer(parent, indent) |
+      openContainer(parent, indent) |
+      assignContainer(parent, indent))
+      .rep(sep = indent.same) map (_ ⇒ parent)
   }
 
   /*def firstContainer: Parser[AST] = {

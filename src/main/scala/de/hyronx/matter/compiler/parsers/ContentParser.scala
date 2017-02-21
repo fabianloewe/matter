@@ -8,38 +8,46 @@ trait ContentParser extends BaseParser {
 
   val range: P[Range] = {
     val rangeLowerCase = P(lowercase.! ~ "-" ~ lowercase.!) map {
-      case (from, to) ⇒
-        Range(from, to)
+      case (from, to) ⇒ Range(from.head, to.head)
     }
     val rangeUpperCase = P(uppercase.! ~ "-" ~ uppercase.!) map {
-      case (from, to) ⇒
-        Range(from, to)
+      case (from, to) ⇒ Range(from.head, to.head)
     }
     val rangeNumber = P(number.! ~ "-" ~ number.!) map {
-      case (from, to) ⇒
-        Range(from.toString, to.toString)
+      case (from, to) ⇒ Range(from.toString.head, to.toString.head)
     }
 
-    P(rangeLowerCase | rangeUpperCase | rangeNumber)
+    P(rangeLowerCase | rangeUpperCase | rangeNumber).log()
   }
 
   val end = P(ws | nl)
   val literalAST = P(literal) map (Literal)
-  val repeat = P("{" ~/ ws ~ definitions ~ ws ~ "}*") map (Repeat)
-  val repeatOne = P("{" ~/ ws ~ definitions ~ ws ~ "}+") map (RepeatOne)
-  val optional = P("[" ~/ ws ~ definitions ~ ws ~ "]") map (Optional)
-  val group = P("(" ~/ ws ~ definitions ~ ws ~ ")") map (Group)
+  val regex = P(range.rep(1)) map (Regex)
+  val repeat = P("{" ~/ ws ~ selection ~ ws ~ "}*") map (Repeat)
+  val repeatOne = P("{" ~/ ws ~ selection ~ ws ~ "}+") map (RepeatOne)
+  val optional = P("[" ~/ ws ~ selection ~ ws ~ "]") map (Optional)
+  val group = P("(" ~/ ws ~ selection ~ ws ~ ")") map (Group)
 
-  private val definitions: P[Definitions] = {
-    P(repeat | repeatOne | optional | group |
-      range | scopedIdentifier | literalAST).rep(min = 1, sep = ws).log()
+  val definitions: P[Definitions] = {
+    P(repeat | repeatOne | optional | group | regex | scopedIdentifier |
+      literalAST)
+      .rep(min = 1, sep = ws).log()
   }
 
+  val selection = P(definitions ~ (ws ~ "|" ~/ ws ~ definitions).?) map (_ match {
+    case (left, Some(right)) ⇒ List(Selection(left, right))
+    case (left, None)        ⇒ left
+  })
+
   def content(indent: Indentation): P[Content] = {
-    P(variable ~ ws.rep(1) ~ "=" ~/ ws ~ definitions).rep(min = 1, sep = indent.same).log() map { result ⇒
-      //val result = seq map { case (newVar, defs, _) ⇒ (newVar, defs) }
-      Content(result.toMap[String, Definitions])
+    val contentWithVars = {
+      P(variable ~ ws.rep(1) ~ "=" ~/ ws ~ selection)
+        .rep(min = 1, sep = indent.same).log() map { result ⇒
+          Content(result.toMap[String, Definitions])
+        }
     }
+    //val contentWithout = P(definitions) map { defs ⇒ Content(Map("" → defs)) }
+    contentWithVars
   }
 
   /*
