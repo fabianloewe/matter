@@ -6,7 +6,7 @@ Matter is a _compiler creating language \(a [DSL](https://en.wikipedia.org/wiki/
 
 * [x] Static typed and [type-inferred](https://en.wikipedia.org/wiki/Type_inference) language
 * [x] Simple syntax inspired by Ruby and Python
-* [x] Clear seperation of each part \(_parsing_, _AST generation_ and _compilation_\) while still keeping all together in its type \(see [Overview](/overview.md)\)
+* [x] Clear seperation of each part \(_parsing_, _AST generation_ and _compilation_\) while still keeping all together in its type \(see the [Documentation](https://www.gitbook.com/book/hyronx/matter-lang/details)\)
 
 ##### And the in-progress and upcoming ones:
 
