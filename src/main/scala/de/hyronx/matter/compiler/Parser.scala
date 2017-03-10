@@ -5,27 +5,27 @@ import scala.collection.mutable.ListBuffer
 import de.hyronx.matter.compiler.ast._
 import de.hyronx.matter.compiler.parsers._
 
-object Parser extends ContentParser with BehaviorParser {
+object Parser extends BaseParser {
   import fastparse.all._
 
   def apply(
     code: String
-  ): Either[ParserError, ContainerTree] = BaseContainer.parser.parse(code) match {
+  ): Either[ParserError, MatterTypeTree] = BaseBuiltIn.parser.parse(code) match {
     case fail: Parsed.Failure      ⇒ Left(ParserError(s"${fail.lastParser}"))
     case Parsed.Success(result, _) ⇒ Right(result)
   }
 
-  val program: P[ContainerTree] = {
+  val program: P[MatterTypeTree] = {
     // Multiple layers of containers may be opened
     // before the first one is newly defined.
     def openContainers(
-      parent: ContainerTree = BaseContainer,
+      parent: MatterTypeTree = BaseBuiltIn,
       indent: Indentation = Indentation(0)
-    ): P[(ContainerTree, Indentation)] = {
+    ): P[(MatterTypeTree, Indentation)] = {
       openContainer(parent, indent) flatMap { next ⇒
         openContainers(next, Indentation(indent)).? map {
-          case Some((container, newIndent)) ⇒ (container, newIndent)
-          case None                         ⇒ (next, indent)
+          case Some((matterType, newIndent)) ⇒ (matterType, newIndent)
+          case None                          ⇒ (next, indent)
         }
       }
     }
@@ -39,19 +39,19 @@ object Parser extends ContentParser with BehaviorParser {
     }
   }
 
-  // @param indent  Indentation of the header of the new container
+  // @param indent  Indentation of the header of the new matterType
   def newContainer(
-    parent: ContainerTree,
+    parent: MatterTypeTree,
     indent: Indentation
-  ): P[ContainerTree] = {
-    P(identifier ~ " < " ~/ scopedIdentifier ~ ":" ~ indent.deeper).log() map {
-      case (id, scoped: Identifier, _) ⇒
-        if (scoped.name == MatterContainer.id) {
+  ): P[MatterTypeTree] = {
+    P(typeName ~ " < " ~/ scopedType ~ ":" ~ indent.deeper).log() map {
+      case (id, scoped: TypeName, _) ⇒
+        if (scoped.name == MatterBuiltIn.id) {
           id
         } else {
           parent.find(scoped) match {
-            case Some(ancestor @ Container(_, content, behavior, _, _, _, _)) ⇒
-              Container(id, content, behavior, ancestor, parent, ListBuffer())
+            case Some(ancestor: MatterType) ⇒
+              MatterType(id, ancestor, parent)
             case _ ⇒
               None
           }
@@ -59,71 +59,97 @@ object Parser extends ContentParser with BehaviorParser {
     } flatMap {
       case id: String ⇒
         newMatter(id, parent, indent)
-      case container: ContainerTree ⇒
-        checkChild(container, Indentation(indent))
+      case matterType: MatterTypeTree ⇒
+        checkChild(matterType, Indentation(indent))
       case None ⇒
         Fail
     }
   }
 
-  // @param indent  Indentation of the header of the new Matter container
+  // @param indent  Indentation of the header of the new Matter matterType
   def newMatter(
     id: String,
-    parent: ContainerTree,
+    parent: MatterTypeTree,
     indent: Indentation
-  ): P[ContainerTree] = {
+  ): P[MatterTypeTree] = {
     val bodyIndent = Indentation(indent)
     def expected(id: String) = P(id ~ ":" ~/ bodyIndent.deeper)
-    val newContent = expected("Content").log() flatMap { _ ⇒
-      content(Indentation(bodyIndent)) map { con ⇒ con.content }
-    }
-    val newBehavior = expected("Behavior") flatMap { _ ⇒
-      behavior
-    }
 
-    P(newContent.? ~ (bodyIndent.same ~ newBehavior ~ bodyIndent.same.?).?).log() map {
-      case (Some(content), Some((_, behavior, _))) ⇒
-        Container(id, content, behavior.toList, MatterContainer, parent)
-      case (_, _) ⇒
-        PseudoContainer(id, MatterContainer, parent)
-    } flatMap { container ⇒
-      println(s"/ New Matter defined: ${container.id} with parent: ${parent.id}")
-      checkChild(container, Indentation(indent)).log()
+    // Check if Syntax is defined (required)
+    expected("Syntax") flatMap { _ ⇒
+      // It is. Parse the syntax definitions
+      SyntaxParser(Indentation(bodyIndent))
+    } flatMap { syntaxVars ⇒
+      // Check if Mapping is defined (optional)
+      (bodyIndent.same ~ expected("Mapping").log()).? flatMap {
+        case Some(_) ⇒ MappingParser(syntaxVars, Indentation(bodyIndent))
+        case None    ⇒ Pass
+      } map {
+        case Mappings(mappings) ⇒
+          println(s"o New Mapping: $mappings")
+          MatterType(
+            id,
+            syntaxVars,
+            collection.mutable.ListBuffer(mappings: _*),
+            MatterBuiltIn,
+            parent
+          )
+        case other ⇒
+          println(s"o No new mapping: $other")
+          MatterType(
+            id,
+            syntaxVars,
+            collection.mutable.ListBuffer(),
+            MatterBuiltIn,
+            parent
+          )
+      }
     }
   }
 
-  // @param indent  Indentation of the header of the opened container
+  // @param indent  Indentation of the header of the opened matterType
   def openContainer[T, V](
-    parent: ContainerTree,
+    parent: MatterTypeTree,
     indent: Indentation
-  ): P[ContainerTree] = {
-    P(scopedIdentifier ~ ":" ~/ indent.deeper).log() map {
-      case (scoped, _) ⇒ parent.find(scoped) map (_.clone)
+  ): P[MatterTypeTree] = {
+    P(scopedType ~ ":" ~/ indent.deeper).log() map {
+      case (scoped, _) ⇒ parent.find(scoped) map (_.clone(None))
     } flatMap {
-      case Some(container) ⇒
-        container.parser
-      /*case Some(container) ⇒
-        checkChild(container, Indentation(indent))*/
+      case Some(syntax: SyntaxBuiltIn) if syntax.parent.isInstanceOf[MatterType] ⇒
+        SyntaxParser(Indentation(indent)) map { syntaxVars ⇒
+          println(s"o Syntax before: ${syntax.parent.asInstanceOf[MatterType].syntax}")
+          syntax.parent.asInstanceOf[MatterType].syntax ++= syntaxVars
+          println(s"o Syntax after: ${syntax.parent.asInstanceOf[MatterType].syntax}")
+          syntax.parent
+        }
+      case Some(mapping: MappingBuiltIn) if mapping.parent.isInstanceOf[MatterType] ⇒
+        val typeParent = mapping.parent.asInstanceOf[MatterType]
+        MappingParser(typeParent.syntax, Indentation(indent)) map { mappings: Mappings ⇒
+          println(s"o Mapping before: ${typeParent.mappings}")
+          typeParent.mappings ++= mappings.mappings
+          println(s"o Mapping after: ${typeParent.mappings}")
+          mapping.parent
+        }
+      case Some(matterType) ⇒
+        println(s"o openContainer: ${matterType.id}")
+        checkChild(matterType, Indentation(indent))
       case None ⇒
         Fail
     }
   }
 
   def assignContainer(
-    parent: ContainerTree,
+    parent: MatterTypeTree,
     indent: Indentation
-  ): P[ContainerTree] = {
-    P(identifier ~ ws.rep(1) ~ "=" ~/ ws ~ scopedIdentifier ~
+  ): P[MatterTypeTree] = {
+    P(typeName ~ ws.rep(1) ~ "=" ~/ ws ~ scopedType ~
       (indent.same | indent.upper())) map {
-      case (id, scoped: Identifier, newIndent) ⇒ parent.find(scoped) match {
-        case Some(Container(_, content, behavior, ancestor, parent, _, children)) ⇒
-          (Container(id, content, behavior, ancestor, parent, children), newIndent)
-        case Some(ContentContainer) ⇒
-          (ContentContainer(id, Indentation(indent), parent), newIndent)
-        case Some(twin) ⇒
-          println(s"! assignContainer twin: ${twin.id}, parent: ${parent.id}")
-          (PseudoContainer(id, twin.ancestor, parent, twin.children), newIndent)
-        case None ⇒
+      case (id, scoped: TypeName, newIndent) ⇒ parent.find(scoped) match {
+        case Some(MatterType(_, content, behavior, ancestor, parent, _, children)) ⇒
+          (MatterType(id, content, behavior, ancestor, parent, children), newIndent)
+        /*case Some(twin) ⇒
+          (PseudoContainer(id, twin.ancestor, parent, twin.children), newIndent)*/
+        case _ ⇒
           None
       }
     } flatMap {
@@ -132,7 +158,7 @@ object Parser extends ContentParser with BehaviorParser {
     }
   }
 
-  def checkChild(parent: ContainerTree, indent: Indentation) = {
+  def checkChild(parent: MatterTypeTree, indent: Indentation) = {
     P(newContainer(parent, indent) |
       openContainer(parent, indent) |
       assignContainer(parent, indent))
@@ -147,7 +173,7 @@ object Parser extends ContentParser with BehaviorParser {
         var parentTuple = parent → -1
 
         processIndents(
-          list map { case container ~ dents ⇒ (container, dents) }
+          list map { case matterType ~ dents ⇒ (matterType, dents) }
         ).scanLeft(parentTuple) { (left, right) ⇒
             //println(s"Comparing $left vs $right\n")
             left._2 match {
@@ -162,7 +188,7 @@ object Parser extends ContentParser with BehaviorParser {
             }
             right
           }.map {
-            element: (Container, Int) ⇒ element._1
+            element: (MatterType, Int) ⇒ element._1
           }.head
       }
   }*/

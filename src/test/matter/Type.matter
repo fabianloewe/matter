@@ -13,7 +13,7 @@ Type < Matter:
 
   Attributes < Matter:
     Content:
-      attributes: { AttributeLiteral }+
+      attributes = { AttributeLiteral }+
     Behavior:
       outer.attributes = attributes
 
@@ -25,6 +25,20 @@ Type < Matter:
       for var in variables:
         var.name += "-variable"
       outer.variables = variables
+	  
+	Variable < Matter:
+	  // No content so nothing has to be defined when opened.
+	  // This means this matterType doesn't have to be opened when somewhere expected.
+	  Behavior:
+		// When a lookup is performed by some Content definition 
+		// check Content of VariableContent
+		on lookup ->
+		  lookup VariableContent  
+	  
+	  VariableContent < Matter:
+		Content:
+		  name = a-z [ a-z0-9 | "-" ]
+		
 
   Variables:
     id: Int
@@ -34,6 +48,10 @@ Type < Matter:
       methods = { MethodDefinition }+
     Behavior:
       outer.methods = methods
+	  
+	MethodDefinition < Statement:
+	  Content:
+		definition = Variable "(" { Variable " " TypeName [ ", " ] }* ")" [ " -> " TypeName ] 
 
   Signals < Matter:
     Content:
@@ -56,6 +74,19 @@ Class < Type:
     @runtime
   Variables:
     id: Int
+	
+  Construction < Matter:
+    Content:
+      parameters = { ParamterStatement }+
+	Behavior:
+	  methods.append Method:
+		name = "construct"
+		arguments = parameters.each _.variable
+    
+    ParameterStatement < Statement:
+	  Content:
+	    variable 	= "with" Variable ":"
+		expressions = { "  " Expression }+
 
   Generics < Matter:
     Content:
@@ -63,11 +94,11 @@ Class < Type:
     Behavior:
       outer.generics = generics
 
-    Traits < Matter:
-      Content:
-        traits = { Trait }+
-      Behavior:
-        outer.traits = traits
+  Traits < Matter:
+    Content:
+      traits = { Trait }+
+    Behavior:
+      outer.traits = traits
 
 Array < Class:
   Generics:

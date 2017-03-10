@@ -2,6 +2,8 @@ package de.hyronx.matter.compiler.engine
 
 import scala.collection.mutable.Map
 
+import fastparse.parsers.Combinators
+
 import de.hyronx.matter.compiler.parsers.BaseParser
 import de.hyronx.matter.compiler.types.Type
 import de.hyronx.matter.compiler.ast._
@@ -9,11 +11,12 @@ import de.hyronx.matter.compiler.ast._
 object ParserGenerator {
   import fastparse.all._
 
-  var container: ContainerTree = BaseContainer
+  var matterType: MatterTypeTree = BaseBuiltIn
 
-  def apply(contentMap: Types.ContentMap, container: ContainerTree) = {
-    this.container = container
+  def apply(contentMap: AST.SyntaxMap, matterType: MatterTypeTree) = {
+    this.matterType = matterType
 
+    println(s"~ Parser map: $contentMap")
     // Generate parser from content definitions
     val parserMap = contentMap map {
       case (key, value) ⇒ key → generate(value).log()
@@ -37,38 +40,41 @@ object ParserGenerator {
     result
   }
 
-  def generate(astSeq: Seq[AST]): P[Any] = {
+  def append(parser: P[Any], f: Seq[AST] ⇒ P[Any]) = {
+
+  }
+
+  def generate(astSeq: Seq[AST]): P[String] = {
     astSeq.headOption match {
       case Some(ast) ⇒ ast match {
-        case Optional(defs) ⇒
-          generate(defs).?
+        case Option(defs) ⇒
+          generate(defs).? map (_ ⇒ s"Optional result for $ast")
         case Repeat(defs) ⇒
-          generate(defs).rep
+          generate(defs).rep map (_ ⇒ s"Repeated result for $ast")
         case RepeatOne(defs) ⇒
-          generate(defs).rep(1)
-        case Regex(defs) ⇒
-          generate(defs) // ~ generate(astSeq.tail)
+          generate(defs).rep(1) map (_ ⇒ s"Repeated at least one result for $ast")
         case Range(from, to) ⇒
-          CharIn(from to to) ~ generate(astSeq.tail)
+          CharIn(from to to) ~ generate(astSeq.tail) map (_ ⇒ s"Range: $from to $to result for $ast")
         case Literal(string) ⇒
-          string.! ~ generate(astSeq.tail)
-        case id: Identifier ⇒
-          this.container.find(id) match {
-            case Some(container) ⇒ P(container.parser ~ generate(astSeq.tail)) map {
-              // TODO: do something with the first part
-              case (_, second) ⇒
-                println(s"~ Container found")
-                second
-            }
+          string.! ~ generate(astSeq.tail) map (_ ⇒ s"Literal result for $ast")
+        case id: TypeName ⇒
+          this.matterType.find(id) match {
+            case Some(matterType) ⇒
+              matterType.parser ~ generate(astSeq.tail) map {
+                // TODO: do something with the first part
+                case (first, second) ⇒
+                  println(s"~ First: ${first.id}, Second: ´$second´ for $ast")
+                  second
+              }
             case None ⇒
-              println(s"~ Container not found")
+              println(s"~ MatterType not found for $ast")
               Fail
           }
-        case definition ⇒
+        case _ ⇒
           Fail
       }
       case None ⇒
-        Pass
+        Pass map (_ ⇒ s"Pass result because no head left")
     }
   }
 }

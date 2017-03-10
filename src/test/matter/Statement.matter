@@ -1,0 +1,25 @@
+Statement < Matter:
+  Syntax:
+    header Grammar
+    body Grammar
+
+    statement = header body
+
+Variable < Matter:
+  Syntax:
+    name Grammar
+  Mapping:
+    name -> String
+
+Variable.Syntax:
+  name = "a".."z" { "a".."z" | "0".."9" | "-" }*
+
+ForStatement < Statement:
+  Syntax:
+    header = "for" Variable "in" Variable
+    body = { Statement }+
+  Mapping:
+    header -> iterator String:
+      header.0
+    header -> iterated String:
+      header.1

@@ -1,29 +1,17 @@
 package de.hyronx.matter.compiler.ast
 
-import scala.collection.mutable.ListBuffer
-
-object Types {
-  type Definitions = Seq[AST]
-  type ContentMap = Map[String, Definitions]
-}
+import de.hyronx.matter.compiler.types.Type
 
 trait AST
-case class Identifier(name: String, var family: List[String] = List()) extends AST
+case class TypeName(name: String, var family: List[String] = List()) extends AST
+case class ParamTypeName(`type`: TypeName, param: TypeName) extends AST
 case class Literal(string: String) extends AST
+// This becomes a Variable AST once 'type' is checked
+case class VariableDecl(name: String, typeName: TypeName) extends AST
+case class Variable(name: String, `type`: Type) extends AST
 
-sealed trait ContentAST extends AST
-case class Range(from: Char, to: Char) extends ContentAST
-case object Whitespace extends ContentAST
-case object CharAny extends ContentAST
-case class Regex(definitions: Types.Definitions) extends ContentAST
-case class Selection(left: Types.Definitions, right: Types.Definitions) extends ContentAST
-case class Repeat(definitions: Types.Definitions) extends ContentAST
-case class RepeatOne(definitions: Types.Definitions) extends ContentAST
-case class Optional(definitions: Types.Definitions) extends ContentAST
-case class Group(definitions: Types.Definitions) extends ContentAST
-case class Content(content: Types.ContentMap) extends AST
-
-case class OnCommand(cmd: String, operation: AST) extends AST
-case class Lookup(id: Identifier) extends AST
-case class LookupList(ids: List[Identifier]) extends AST
-case class InDo(id: Identifier, operation: AST) extends AST
+object AST {
+  type Definitions = Seq[AST]
+  type SyntaxMap = collection.mutable.Map[String, AST]
+  type Mappings = collection.mutable.ListBuffer[Mapping]
+}

@@ -8,29 +8,29 @@ object Executer extends BaseParser {
   import fastparse.all._
 
   def generate(
-    openContainer: ContainerTree
+    openContainer: MatterTypeTree
   ): List[(String, P[Any])] = openContainer match {
-    case container: Container ⇒
-      generateParser(container, container.content)
+    case matterType: MatterType ⇒
+      generateParser(matterType, matterType.content)
     case pseudo: PseudoContainer ⇒
       generate(pseudo.ancestor)
-    case container ⇒
-      generate(container)
+    case matterType ⇒
+      generate(matterType)
   }
 
   def generateParser(
-    container: Container,
-    content: Types.ContentMap
+    matterType: MatterType,
+    content: AST.SyntaxMap
   ): List[(String, P[Any])] = {
     content.headOption match {
       case Some((variable, ast)) ⇒
-        (variable, ParserGenerator(ast)) :: generateParser(container, content.tail)
+        (variable, ParserGenerator(ast)) :: generateParser(matterType, content.tail)
       case None ⇒
         List()
     }
   }
 
-  def apply(parent: ContainerTree) = {
+  def apply(parent: MatterTypeTree) = {
     generate(parent) map {
       case (variable, parser) ⇒
         parser

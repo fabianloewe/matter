@@ -1,0 +1,10 @@
+MyClass < Class:
+  Variables:
+	counter Int
+  Construction:
+	with start-counter Int:
+	  counter = if start-counter < 0: 0 else: start-counter
+  Methods:
+	count(up Int = 1):
+	  counter += up
+	Variable: name = "count"(Variable: 
