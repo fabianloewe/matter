@@ -15,6 +15,10 @@ case object StringMapping extends MappingAST
 case object IntMapping extends MappingAST
 case object FloatMapping extends MappingAST
 
-sealed trait Mapping extends AST
-case class MappingExpression(syntaxVar: String, mappedVar: String, `type`: Type, op: MappingAST) extends Mapping
-case class MappingStatement(syntaxVar: String, mappedVar: String, `type`: Type, op: Seq[MappingAST]) extends Mapping
+sealed trait Mapping extends AST {
+  def syntaxVar: String
+  def mappedVar: String
+  def varType: Type
+}
+case class MappingExpression(syntaxVar: String, mappedVar: String, varType: Type, op: MappingAST) extends Mapping
+case class MappingStatement(syntaxVar: String, mappedVar: String, varType: Type, op: Seq[MappingAST]) extends Mapping

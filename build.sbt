@@ -8,9 +8,9 @@ organization := "de.hyronx"
 
 version := "0.0.1"
 
-scalaVersion := "2.12.0"
+scalaVersion := "2.12.1"
 
-crossScalaVersions := Seq("2.11.8", "2.12.0")
+crossScalaVersions := Seq("2.11.8", "2.12.1")
 
 resolvers ++= Seq(
   "Sonatype OSS Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/"
@@ -35,7 +35,6 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.0" % "test",
   "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
 
-  //"org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
   "com.lihaoyi" %% "fastparse" % "0.4.2"
 )
 

@@ -43,7 +43,7 @@ class MappingParser(syntaxVars: AST.SyntaxMap, indent: Indentation) extends Base
   }
 
   val callExpression: P[CallExpression] = {
-    P(variableName ~ "." ~ (variableName | number)).log() map {
+    P(variableName ~ "." ~ (variableName | number)) map {
       case (varName, methodName) ⇒ variables get varName match {
         case Some(syntaxType) ⇒
           syntaxType.varType findMethod methodName match {
@@ -83,7 +83,7 @@ class MappingParser(syntaxVars: AST.SyntaxMap, indent: Indentation) extends Base
   val body = {
     P(indent.deeper ~
       new MappingParser(syntaxVars, Indentation(indent)).operations ~
-      indent.same.?).log() map {
+      indent.same.?) map {
       case (_, ops, _) ⇒ ops
     }
   }
@@ -120,15 +120,15 @@ class MappingParser(syntaxVars: AST.SyntaxMap, indent: Indentation) extends Base
   private val mapParser = P(variableName ~ " -> " ~ (scopedType | variableDecl))
 
   val mapStatement: P[Mapping] = {
-    P(mapParser ~ ":").log().map {
+    P(mapParser ~ ":").map {
       // Check if typeName is a valid type
       case (syntaxVar, typeName: TypeName) ⇒
         (syntaxVar, syntaxVar, Type(typeName))
       case (syntaxVar, VariableDecl(varName, varType)) ⇒
         (syntaxVar, varName, Type(varType))
       case (_, _) ⇒
-        // This is acceptable because filter will fail on None (4th element)
-        // while keeping the types correct
+        // This is acceptable because filter will fail on None (3th element)
+        // while this approach keeps the types correct
         ("", "", None)
     } filter (_._3.isDefined) flatMap {
       case (syntaxVar, mappedVar, mappedType) ⇒
@@ -139,7 +139,7 @@ class MappingParser(syntaxVars: AST.SyntaxMap, indent: Indentation) extends Base
   }
 
   val mapExpression: P[Mapping] = {
-    mapParser.log() map {
+    mapParser map {
       // Check if typeName is a valid type
       case (syntaxVar, typeName: TypeName) ⇒
         (syntaxVar, syntaxVar, typeName, Type(typeName))
@@ -152,7 +152,7 @@ class MappingParser(syntaxVars: AST.SyntaxMap, indent: Indentation) extends Base
   }
 
   val mapping: P[Mappings] = {
-    (mapStatement | mapExpression).rep(1).log() map { seq ⇒
+    (mapStatement | mapExpression).rep(1) map { seq ⇒
       Mappings(seq)
     }
   }

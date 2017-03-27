@@ -17,7 +17,7 @@ class SyntaxParser(indent: Indentation) extends BaseParser {
       case (from, to) ⇒ Range(from.toString.head, to.toString.head)
     }
 
-    P(rangeLowerCase | rangeUpperCase | rangeNumber).log()
+    P(rangeLowerCase | rangeUpperCase | rangeNumber)
   }
 
   val end = P(ws | nl)
@@ -37,15 +37,12 @@ class SyntaxParser(indent: Indentation) extends BaseParser {
     case defs           ⇒ Option(defs)
   }
 
-  val group = P("(" ~ ws ~ selection ~ ws ~ ")") map {
-    case sel: Selection ⇒ Group(sel)
-    case defs           ⇒ Group(defs)
-  }
+  val group = P("(" ~ ws ~ selection ~ ws ~ ")")
 
   val concatenation: P[AST] = {
-    P(repeat | repeatOne | option | group | range | scopedType.log() |
+    P(repeat | repeatOne | option | group | range | scopedType |
       variableName.map(VariableUsage) |
-      literalAST).log()
+      literalAST)
       .rep(min = 1, sep = ws) map { seq ⇒
         if (seq.size > 1)
           Concatenation(seq)
@@ -54,7 +51,7 @@ class SyntaxParser(indent: Indentation) extends BaseParser {
       }
   }
 
-  val selection: P[AST] = concatenation.rep(min = 1, sep = P(ws ~ "|" ~ ws)).log() map { seq ⇒
+  val selection: P[AST] = concatenation.rep(min = 1, sep = P(ws ~ "|" ~ ws)) map { seq ⇒
     if (seq.size > 1)
       Selection(seq)
     else
@@ -76,7 +73,7 @@ class SyntaxParser(indent: Indentation) extends BaseParser {
             })
           )
         }
-    ).rep(min = 1, sep = indent.same).log() map { result ⇒
+    ).rep(min = 1, sep = indent.same) map { result ⇒
         println(s"` Content map: $result")
         // TODO: Add check if all variables exist
         collection.mutable.Map(result: _*)

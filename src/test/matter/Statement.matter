@@ -17,7 +17,7 @@ Variable.Syntax:
 ForStatement < Statement:
   Syntax:
     header = "for" Variable "in" Variable
-    body = { Statement }+
+    body = "print" Variable
   Mapping:
     header -> iterator String:
       header.0

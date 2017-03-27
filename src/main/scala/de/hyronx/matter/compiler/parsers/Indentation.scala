@@ -7,15 +7,15 @@ import de.hyronx.matter.compiler.ast._;
 class Indentation(val indent: Int = 0) {
   import Indentation._
 
-  val same = P(nl.rep(1) ~ ws.rep(exactly = indent).!).log() map { x ⇒
+  val same = P(nl.rep(1) ~ ws.rep(exactly = indent).!) map { x ⇒
     println(s"Same indent: ${x.length}")
     this
   }
-  val deeper = P(nl ~ ws.rep(exactly = indent + 2).!).log() map { x ⇒
+  val deeper = P(nl ~ ws.rep(exactly = indent + 2).!) map { x ⇒
     println(s"Deeper indent: ${x.length}")
     Indentation(x.length)
   }
-  def upper(repeat: Int = 1) = P(nl ~ ws.rep(max = indent - 2).!).log() map { x ⇒
+  def upper(repeat: Int = 1) = P(nl ~ ws.rep(max = indent - 2).!) map { x ⇒
     println(s"Upper indent: ${x.length}")
     Indentation(x.length)
   }
