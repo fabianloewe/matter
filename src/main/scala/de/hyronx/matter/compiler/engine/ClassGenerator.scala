@@ -4,30 +4,34 @@ import cafebabe._
 import cafebabe.ByteCodes._
 import cafebabe.AbstractByteCodes._
 
+import de.hyronx.matter.Config
+
 import de.hyronx.matter.compiler.ast.{ MatterType, MatterBuiltIn }
 import de.hyronx.matter.compiler.types.Type
 
-class ClassGenerator(matterType: MatterType) {
+class ClassGenerator(matterType: MatterType)(implicit config: Config, pkg: Package) {
   import Helpers._
 
-  private val ancestor = matterType.ancestor match {
+  /*private val ancestor = matterType.ancestor match {
     case MatterBuiltIn ⇒ None
     case _             ⇒ Some(matterType.ancestor.id)
-  }
-  private val classFile = new ClassFile(matterType.id, ancestor)
+  }*/
+  private val classFile = pkg.addClass(matterType.id, None)
 
   private def generateGetterMethod(fieldName: String, fieldType: String) = {
     val fieldGetter = "get" + Helpers.capitalize(fieldName)
     val getterCode = classFile.addMethod(fieldType, fieldGetter, "").codeHandler
     getterCode <<
-      GetField(matterType.id, fieldName, fieldType) <<
-      RETURN
+      ArgLoad(0) <<
+      GetField(classFile.className, fieldName, fieldType) <<
+      ARETURN
     getterCode.freeze
 
     val scalaGetterCode = classFile.addMethod(fieldType, fieldName, "").codeHandler
     scalaGetterCode <<
-      GetField(matterType.id, fieldName, fieldType) <<
-      RETURN
+      ArgLoad(0) <<
+      GetField(classFile.className, fieldName, fieldType) <<
+      ARETURN
     scalaGetterCode.freeze
   }
 
@@ -37,7 +41,7 @@ class ClassGenerator(matterType: MatterType) {
     setterCode <<
       ArgLoad(0) <<
       ArgLoad(1) <<
-      PutField(matterType.id, fieldName, fieldType) <<
+      PutField(classFile.className, fieldName, fieldType) <<
       RETURN
     setterCode.freeze
 
@@ -45,7 +49,7 @@ class ClassGenerator(matterType: MatterType) {
     scalaSetterCode <<
       ArgLoad(0) <<
       ArgLoad(1) <<
-      PutField(matterType.id, fieldName, fieldType) <<
+      PutField(classFile.className, fieldName, fieldType) <<
       RETURN
     scalaSetterCode.freeze
   }
@@ -84,10 +88,7 @@ class ClassGenerator(matterType: MatterType) {
     val constructor = classFile.addConstructor(properties map (_._2)).codeHandler
     constructor <<
       ArgLoad(0) <<
-      InvokeSpecial(ancestor match {
-        case Some(superType) ⇒ superType
-        case None            ⇒ "java/lang/Object"
-      }, "<init>", "()V")
+      InvokeSpecial.apply("java/lang/Object", "<init>", "()V")
 
     var index = 1
     properties foreach {
@@ -96,7 +97,7 @@ class ClassGenerator(matterType: MatterType) {
         constructor <<
           ArgLoad(0) <<
           ArgLoad(index) <<
-          InvokeVirtual(matterType.id, setter, "(" + propType + ")V")
+          InvokeVirtual(classFile.className, setter, "(" + propType + ")V")
         index += 1
     }
 
@@ -113,11 +114,11 @@ class ClassGenerator(matterType: MatterType) {
     println(s"ClassGenerator:generate! Props: $props")
 
     generateConstructor(props)
-
     classFile
   }
 }
 
 object ClassGenerator {
-  def apply(matterType: MatterType) = new ClassGenerator(matterType).generate
+  def apply(matterType: MatterType)(implicit config: Config, pkg: Package) =
+    new ClassGenerator(matterType).generate
 }

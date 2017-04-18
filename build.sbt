@@ -12,8 +12,11 @@ scalaVersion := "2.12.1"
 
 crossScalaVersions := Seq("2.11.8", "2.12.1")
 
+enablePlugins(JavaAppPackaging)
+
 resolvers ++= Seq(
-  "Sonatype OSS Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/"
+  "Sonatype OSS Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
+  "SnakeYAML repositroy" at "http://oss.sonatype.org/content/groups/public/"
 )
 
 libraryDependencies ++= Seq(
@@ -35,7 +38,9 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.0" % "test",
   "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
 
-  "com.lihaoyi" %% "fastparse" % "0.4.2"
+  "com.lihaoyi" %% "fastparse" % "0.4.2",
+  "com.github.scopt" %% "scopt" % "3.5.0",
+  "org.yaml" % "snakeyaml" % "1.18"
 )
 
 scalacOptions ++= Seq(

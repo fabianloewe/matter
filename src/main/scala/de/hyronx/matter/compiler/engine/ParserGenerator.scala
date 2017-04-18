@@ -8,28 +8,39 @@ import cafebabe.AbstractByteCodes._
 
 import fastparse.all.P
 
+import de.hyronx.matter.library._
+
+import de.hyronx.matter.Config
 import de.hyronx.matter.compiler.Generator
 import de.hyronx.matter.compiler.types.Type
 import de.hyronx.matter.compiler.ast._
 import de.hyronx.matter.compiler.generators.Helpers._
 
-class ParserGenerator(matterType: MatterType, classFile: ClassFile) {
-  //private val syntaxVarNames = matterType.syntax map { case (name, _) => name }
+class ParserGenerator(
+    matterType: MatterType,
+    classFile: ClassFile
+)(
+    implicit
+    config: Config,
+    pkg: Package
+) {
+  //private val className = matterType.id + "$" + parserName + "Builder"
 
-  private val fpParserType = "Lfastparse/core/Parser;"
-  private val fpWrapperName = "de/hyronx/matter/support/FastparseWrapper"
-  private val optWrapper = s"($fpParserType)$fpParserType"
-  private val repWrapper = s"(${fpParserType}I${fpParserType}II)$fpParserType"
+  private val PARSER_CLASS = "fastparse/core/Parser"
+  private val PARSER_TYPE = s"L${PARSER_CLASS};"
+  private val WRAPPER_CLASS = "de/hyronx/matter/library/FastparseWrapper"
+  private val OPT_WRAPPER_SIG = s"($PARSER_TYPE)$PARSER_TYPE"
+  private val REP_WRAPPER_SIG = s"(${PARSER_TYPE}ILscala/Option;II)$PARSER_TYPE"
 
   def generateParser(
     codeHandler: CodeHandler,
     ast: AST
   ): Unit = {
     def generateMultipleParsers(defs: Seq[AST], funcName: String) = {
-      val arrayVar = codeHandler.getFreshVar
+      val arrayVar = codeHandler.getFreshVar(s"[$PARSER_TYPE")
       codeHandler <<
         Ldc(defs.length) <<
-        NewArray(fpParserType) <<
+        NewArray(PARSER_CLASS) <<
         AStore(arrayVar) <<
         Comment("ParserGenerator:generateMultipleParsers! children follow")
 
@@ -44,7 +55,7 @@ class ParserGenerator(matterType: MatterType, classFile: ClassFile) {
       codeHandler <<
         Comment("ParserGenerator:generateMultipleParsers! children called") <<
         ALoad(arrayVar) <<
-        InvokeStatic(fpWrapperName, funcName, MethodSig1[Seq[_], P[_]])
+        InvokeStatic(WRAPPER_CLASS, funcName, s"([$PARSER_TYPE)$PARSER_TYPE")
     }
 
     ast match {
@@ -53,7 +64,7 @@ class ParserGenerator(matterType: MatterType, classFile: ClassFile) {
         generateParser(codeHandler, option)
         codeHandler <<
           Comment("Create optional parser") <<
-          InvokeStatic(fpWrapperName, "opt", optWrapper) <<
+          InvokeStatic(WRAPPER_CLASS, "opt", OPT_WRAPPER_SIG) <<
           Comment("Created optional parser")
       case Repeat(rep) ⇒
         println("ParserGenerator:generateParser! Creating repetition parser")
@@ -61,10 +72,10 @@ class ParserGenerator(matterType: MatterType, classFile: ClassFile) {
         codeHandler <<
           Comment("Create repetition parser") <<
           Ldc(0) <<
-          DefaultNew("fastparse/all/Pass") <<
-          Ldc(0) <<
+          ACONST_NULL <<
+          InvokeStatic("scala/Int", "MaxValue", "()I") <<
           Ldc(-1) <<
-          InvokeStatic(fpWrapperName, "rep", repWrapper) <<
+          InvokeStatic(WRAPPER_CLASS, "rep", REP_WRAPPER_SIG) <<
           Comment("Created repetition parser")
       case RepeatOne(rep) ⇒
         println("ParserGenerator:generateParser! Create simple literal parser")
@@ -72,10 +83,10 @@ class ParserGenerator(matterType: MatterType, classFile: ClassFile) {
         codeHandler <<
           Comment("Create repeat-once parser") <<
           Ldc(1) <<
-          DefaultNew("fastparse/all/Pass") <<
+          ACONST_NULL <<
           Ldc(0) <<
           Ldc(-1) <<
-          InvokeStatic(fpWrapperName, "rep", repWrapper) <<
+          InvokeStatic(WRAPPER_CLASS, "rep", REP_WRAPPER_SIG) <<
           Comment("Created repeat-once parser")
       case Range(from, to) ⇒
         println("ParserGenerator:generateParser! Creating range parser")
@@ -83,7 +94,7 @@ class ParserGenerator(matterType: MatterType, classFile: ClassFile) {
           Comment("Create range parser") <<
           Ldc(from) <<
           Ldc(to) <<
-          InvokeStatic(fpWrapperName, "range", MethodSig2[Char, Char, P[_]]) <<
+          InvokeStatic(WRAPPER_CLASS, "range", s"(CC)$PARSER_TYPE") <<
           Comment("Created range parser")
       case Concatenation(defs) ⇒
         println("ParserGenerator:generateParser! Creating concatenation parser")
@@ -96,7 +107,7 @@ class ParserGenerator(matterType: MatterType, classFile: ClassFile) {
         codeHandler <<
           Comment("Create simple literal parser") <<
           Ldc(string) <<
-          InvokeStatic(fpWrapperName, "literal", MethodSig1[String, P[_]]) <<
+          InvokeStatic(WRAPPER_CLASS, "literal", s"(Ljava/lang/String;)$PARSER_TYPE") <<
           Comment("Created simple literal parser")
       case VariableUsage(varName) ⇒
         matterType.syntax find { case (syntaxVar, _) ⇒ syntaxVar == varName } match {
@@ -110,7 +121,7 @@ class ParserGenerator(matterType: MatterType, classFile: ClassFile) {
 
             codeHandler <<
               Comment("Create Matter type parser") <<
-              InvokeStatic(matterTypeClass.className, "parse", s"()$fpParserType") <<
+              InvokeStatic(matterTypeClass.className, "parse", s"()$PARSER_TYPE") <<
               Comment("Created Matter type parser")
           case Some(other) ⇒
             println(s"ParserGenerator:generateParser! Got matter type: $other")
@@ -126,53 +137,49 @@ class ParserGenerator(matterType: MatterType, classFile: ClassFile) {
   }
 
   // @param parserName Should be the capitalized name of the generated parser
-  def generateParserBuilder(parserName: String)(f: MethodHandler ⇒ Unit) = {
+  def generateParserBuilder(parserName: String, op: AST): Unit = {
     println(s"ParserGenerator:generateParserBuilder($parserName)")
-    val parserClass = new ClassFile(parserName + "Builder", None)
-    parserClass.addInterface("de/hyronx/matter/support/ParserBuilder")
+    val parserClass = pkg.addClass(matterType.id + "$" + s"${parserName}Builder", None)
+    parserClass.addInterface("de/hyronx/matter/library/ParserBuilder")
     parserClass.addDefaultConstructor
-    val applyMethod = parserClass.addMethod("Lfastparse/core/Parser;", "apply", "V")
-    f(applyMethod)
-    parserClass
+
+    val methodCH = parserClass.addMethod(PARSER_TYPE, "apply").codeHandler
+    generateParser(methodCH, op)
+    methodCH << ARETURN
+    methodCH.freeze
   }
 
   def generate: ClassFile = {
-    val parserFlags = (Flags.FIELD_ACC_PRIVATE |
+    val parserFlags = (
+      Flags.FIELD_ACC_PRIVATE |
       Flags.FIELD_ACC_STATIC |
-      Flags.FIELD_ACC_FINAL).asInstanceOf[Short]
+      Flags.FIELD_ACC_FINAL
+    ).asInstanceOf[Short]
 
-    val staticInit = classFile.addMethod("V", "<clinit>", "")
-    staticInit.setFlags(Flags.METHOD_ACC_STATIC)
-    val staticInitCH = staticInit.codeHandler
+    val staticInitCH = classFile.addStaticBlock.codeHandler
 
     val mainParser = matterType.syntax.map {
       case (syntaxVar, op) ⇒
-        classFile.addField(fpParserType, syntaxVar)
+        val parserVar = syntaxVar + "Parser"
+        classFile.addField(PARSER_TYPE, parserVar)
           .setFlags(parserFlags)
 
         val parserName = Helpers.capitalize(syntaxVar)
 
         // Initialize static parser
         staticInitCH <<
-          DefaultNew(parserName + "Builder") <<
-          InvokeStatic(matterType.id, "buildParser", s"(Lde/hyronx/matter/support/ParserBuilder;)$fpParserType") <<
-          PutStatic(matterType.id, syntaxVar, fpParserType)
+          DefaultNew(classFile.className + "$" + parserName + "Builder") <<
+          InvokeStatic(WRAPPER_CLASS, "buildParser", s"(Lde/hyronx/matter/library/ParserBuilder;)$PARSER_TYPE") <<
+          PutStatic(classFile.className, parserVar, PARSER_TYPE)
 
-        val parserBuilder = generateParserBuilder(parserName) { methodHandler ⇒
-          val methodCH = methodHandler.codeHandler
-
-          generateParser(methodCH, op)
-          methodCH << ARETURN
-          methodCH.freeze
-        }
-        parserBuilder.writeToFile(matterType.id + "$" + parserBuilder.className + ".class")
-        parserName
+        val parserBuilder = generateParserBuilder(parserName, op)
+        parserVar
     }.last
 
-    val parseMethod = classFile.addMethod(fpParserType, "parse", "")
+    val parseMethod = classFile.addMethod(PARSER_TYPE, "parse")
     parseMethod.setFlags((Flags.METHOD_ACC_PUBLIC | Flags.METHOD_ACC_STATIC).asInstanceOf[Short])
     parseMethod.codeHandler <<
-      GetStatic(classFile.className, mainParser, fpParserType) <<
+      GetStatic(classFile.className, mainParser, PARSER_TYPE) <<
       ARETURN
     parseMethod.codeHandler.freeze
 
@@ -184,7 +191,7 @@ class ParserGenerator(matterType: MatterType, classFile: ClassFile) {
 }
 
 object ParserGenerator {
-  def apply(matterType: MatterType, classFile: ClassFile) = {
+  def apply(matterType: MatterType, classFile: ClassFile)(implicit config: Config, pkg: Package) = {
     new ParserGenerator(matterType, classFile).generate
   }
 }
