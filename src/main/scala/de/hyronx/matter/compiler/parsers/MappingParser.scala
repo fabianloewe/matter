@@ -1,65 +1,66 @@
 package de.hyronx.matter.compiler.parsers
 
+import java.util.NoSuchElementException
+
+import de.hyronx.matter.compiler.ParserError
+import de.hyronx.matter.compiler.Helpers._
 import de.hyronx.matter.compiler.ast._
 import de.hyronx.matter.compiler.types._
 
 class MappingParser(syntaxVars: AST.SyntaxMap, indent: Indentation) extends BaseParser {
   case class SyntaxVariable(varType: Type, defs: AST)
 
-  println("New instance")
-
   import fastparse.all._
 
   val variables = syntaxVars.collect {
-    case (varName, defs) ⇒ (varName, getType(defs))
+    case (varName, defs) ⇒ varName → SyntaxVariable(defs.getType(syntaxVars), defs)
   }.toMap[String, SyntaxVariable]
 
-  private def getType(ast: AST): SyntaxVariable = {
-    def matchSyntax(ast: AST): Type = ast match {
-      case Option(internalDefs)    ⇒ OptionalType(getType(internalDefs).varType)
-      case Repeat(internalDefs)    ⇒ ListType(getType(internalDefs).varType)
-      case RepeatOne(internalDefs) ⇒ ListType(getType(internalDefs).varType)
-      case Literal(string)         ⇒ StringType
-      // TODO: Add real implementation
-      case _                       ⇒ VoidType
-    }
-
-    def matchTupleTypes(ast: Seq[AST]): List[Type] = ast.headOption match {
-      case Some(head) ⇒ matchSyntax(head) :: matchTupleTypes(ast.tail)
-      case None       ⇒ List()
-    }
-
-    SyntaxVariable(
-      ast match {
-        case Concatenation(defs) ⇒ TupleType(matchTupleTypes(defs))
-        case Declaration(syntaxType) ⇒ syntaxType match {
-          case SyntaxType.String  ⇒ StringType
-          case SyntaxType.Grammar ⇒ TupleType
-        }
-        case ast ⇒ matchSyntax(ast)
-      },
-      ast
-    )
-  }
+  println(s"MappingParser:variables! Map: $variables")
 
   val callExpression: P[CallExpression] = {
-    P(variableName ~ "." ~ (variableName | number)) map {
-      case (varName, methodName) ⇒ variables get varName match {
-        case Some(syntaxType) ⇒
-          syntaxType.varType findMethod methodName match {
-            case Some(method) ⇒ Some(CallExpression(Variable(varName, syntaxType.varType), method))
-            case None         ⇒ None
-          }
-        case None ⇒ None
+    // Chained calls must know the caller's type
+    def chainedCallExpression(varType: Type): P[CallExpression] = {
+      // Caller may have a number as a member (e.g. for Collection types)
+      P((number | variableName) ~ ".") flatMap { varName ⇒
+        // Check if the caller ('varType') contains this member ('varName')
+        varType findMember varName match {
+          case Some(callerVar) ⇒
+            P(chainedCallExpression(callerVar.varType) | number | variableName) map {
+              case call: CallExpression ⇒ Some(CallExpression(callerVar, call))
+              case callee: String ⇒ callerVar.varType findMember callee match {
+                case Some(target) ⇒ Some(CallExpression(callerVar, target))
+                case None         ⇒ None
+              }
+            } filter (_.isDefined) map (_.get)
+          case None ⇒ Fail
+        }
       }
-    } filter (_.isDefined) map (_.get)
+    }
+
+    // The first call must be made by a known variable
+    P(variableName ~ ".") flatMap { varName ⇒
+      // Find the specified variable ('varName')
+      variables get varName match {
+        case Some(callerVar) ⇒
+          P(chainedCallExpression(callerVar.varType) | number | variableName) map {
+            case call: CallExpression ⇒
+              Some(CallExpression(Variable(varName, callerVar.varType), call))
+            case callee: String ⇒ callerVar.varType findMember callee match {
+              case Some(target) ⇒ Some(CallExpression(Variable(varName, callerVar.varType), target))
+              case None         ⇒ None
+            }
+          } filter (_.isDefined) map (_.get)
+        case None ⇒ Fail
+      }
+    }
   }
 
   val expression = callExpression
 
   val boolExpression: P[CallExpression] = {
     callExpression map { call: CallExpression ⇒
-      if (call.method.retType == BoolType)
+      if (call.varType == BoolType)
         call
       else
         None
@@ -88,31 +89,17 @@ class MappingParser(syntaxVars: AST.SyntaxMap, indent: Indentation) extends Base
     }
   }
 
-  /*
-  val operation = {
-    Pass
-  }
-
-  val mapStatement = {
-    P(variable ~ " -> " ~ typeName) flatMap {
-      case (syntaxVar, _, id) ⇒ operation.rep map { ops ⇒
-        Mapping(syntaxVar, id, ops)
-      }
-    }
-  }
-  */
-
   private val mapFactory: PartialFunction[(String, String, TypeName, scala.Option[Type]), Mapping] = {
-    // typeName was found
+    // Called if typeName was found
     case (syntaxVar, mappedVar, typeName, typeDef) ⇒ MappingExpression(
       syntaxVar,
       mappedVar,
       typeDef.get,
       typeName.name match {
         case "String" ⇒ StringMapping
+        case "Bool"   ⇒ BoolMapping
         case "Int"    ⇒ IntMapping
-        // TODO: Implement
-        case _        ⇒ StringMapping
+        case "Float"  ⇒ FloatMapping
       }
     )
   }
@@ -120,21 +107,20 @@ class MappingParser(syntaxVars: AST.SyntaxMap, indent: Indentation) extends Base
   private val mapParser = P(variableName ~ " -> " ~ (scopedType | variableDecl))
 
   val mapStatement: P[Mapping] = {
-    P(mapParser ~ ":").map {
+    P(mapParser ~ ":") map {
       // Check if typeName is a valid type
       case (syntaxVar, typeName: TypeName) ⇒
         (syntaxVar, syntaxVar, Type(typeName))
       case (syntaxVar, VariableDecl(varName, varType)) ⇒
         (syntaxVar, varName, Type(varType))
       case (_, _) ⇒
-        // This is acceptable because filter will fail on None (3th element)
+        // This is acceptable because filter will fail on None (3rd element)
         // while this approach keeps the types correct
         ("", "", None)
     } filter (_._3.isDefined) flatMap {
-      case (syntaxVar, mappedVar, mappedType) ⇒
-        body map { seq ⇒
-          MappingStatement(syntaxVar, mappedVar, mappedType.get, seq)
-        }
+      case (syntaxVar, mappedVar, mappedType) ⇒ body map { seq ⇒
+        MappingStatement(syntaxVar, mappedVar, mappedType.get, seq)
+      }
     }
   }
 

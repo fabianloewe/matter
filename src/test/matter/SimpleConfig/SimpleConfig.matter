@@ -1,0 +1,44 @@
+Variable < Matter:
+  Syntax:
+    name = "a".."z" "V" { "a".."z" | "0".."9" | "-" | "_" }*
+  Mapping:
+    name -> String
+
+Literal < Matter:
+  Syntax:
+    data Grammar
+
+Assignment < Matter:
+  Syntax:
+    assignment Grammar
+
+StringLiteral < Literal:
+  Syntax:
+    data = "'" { "a".."z" | "A".."Z" | "0".."9" }* "'"
+  Mapping:
+    data -> String
+
+StringAssignment < Assignment:
+  Syntax:
+    assignment = Variable " = " StringLiteral
+  Mapping:
+    assignment -> variable String:
+      assignment.0.name
+    assignment -> literal String:
+      assignment.2.data
+
+NumberLiteral < Literal:
+  Syntax:
+    numbers = { "0".."9" }*
+    data = numbers [ "." numbers ]
+  Mapping:
+    data -> Float
+
+NumberAssignment < Assignment:
+  Syntax:
+    assignment = Variable " = " NumberLiteral
+  Mapping:
+    assignment -> variable String:
+      assignment.0.name
+    assignment -> literal Float:
+      assignment.2.data

@@ -8,13 +8,13 @@ class SyntaxParser(indent: Indentation) extends BaseParser {
 
   val range: P[Range] = {
     val rangeLowerCase = P("\"" ~ lowercase.! ~ "\"..\"" ~ lowercase.! ~ "\"") map {
-      case (from, to) ⇒ Range(from.head, to.head)
+      case (from, to) ⇒ Range(from, to)
     }
     val rangeUpperCase = P("\"" ~ uppercase.! ~ "\"..\"" ~ uppercase.! ~ "\"") map {
-      case (from, to) ⇒ Range(from.head, to.head)
+      case (from, to) ⇒ Range(from, to)
     }
     val rangeNumber = P("\"" ~ number.! ~ "\"..\"" ~ number.! ~ "\"") map {
-      case (from, to) ⇒ Range(from.toString.head, to.toString.head)
+      case (from, to) ⇒ Range(from.toString, to.toString)
     }
 
     P(rangeLowerCase | rangeUpperCase | rangeNumber)

@@ -2,6 +2,7 @@ package de.hyronx.matter.compiler
 
 import scala.collection.mutable.ListBuffer
 
+import de.hyronx.matter.Config
 import de.hyronx.matter.compiler.ast._
 import de.hyronx.matter.compiler.parsers._
 
@@ -10,7 +11,10 @@ object Parser extends BaseParser {
 
   def apply(
     code: String
-  ): Either[ParserError, MatterTypeTree] = BaseBuiltIn.parser.parse(code) match {
+  )(
+    implicit
+    config: Config
+  ): Either[ParserError, MatterTypeTree] = BaseBuiltIn(config.packageName).parser.parse(code) match {
     case fail: Parsed.Failure      ⇒ Left(ParserError(s"${fail.lastParser}"))
     case Parsed.Success(result, _) ⇒ Right(result)
   }

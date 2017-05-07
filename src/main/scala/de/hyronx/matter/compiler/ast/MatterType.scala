@@ -98,7 +98,7 @@ case class MatterType(
   }
 
   override def toString = {
-    s"MatterType(id=$id, ancestor=${ancestor.id}, parent=${parent.id}, children=$children, abstract=$isAbstract)"
+    s"MatterType(id=$id)"
   }
 }
 
@@ -155,7 +155,10 @@ case object BaseBuiltIn extends MatterTypeTree {
   val parent = this
   val children = Set.empty[MatterTypeTree]
 
-  def apply(id: String) = this.id = id
+  def apply(id: String) = {
+    this.id = id
+    this
+  }
   def clone(newParent: scala.Option[MatterTypeTree] = None) = this
 
   import fastparse.all._
@@ -180,7 +183,7 @@ case object MatterBuiltIn extends MatterTypeTree {
   def clone(newParent: scala.Option[MatterTypeTree] = None) = this
 
   override def toString = {
-    s"MatterBuiltIn(id=Matter, ancestor=this, parent=BaseBuiltIn, children=Set(SyntaxBuiltIn, MappingBuiltIn))"
+    s"MatterBuiltIn(id=Matter)"
   }
 }
 
@@ -195,7 +198,7 @@ case class SyntaxBuiltIn(parent: MatterTypeTree) extends MatterTypeTree {
   }
 
   override def toString = {
-    s"SyntaxBuiltIn(id=Syntax, ancestor=this, parent=${parent.id}, children=Set())"
+    s"SyntaxBuiltIn(id=Syntax)"
   }
 }
 
@@ -210,6 +213,6 @@ case class MappingBuiltIn(parent: MatterTypeTree) extends MatterTypeTree {
   }
 
   override def toString = {
-    s"MappingBuiltIn(id=Mapping, ancestor=this, parent=${parent.id}, children=Set())"
+    s"MappingBuiltIn(id=Mapping)"
   }
 }

@@ -1,7 +1,7 @@
 package de.hyronx.matter.compiler.types
 
 trait NumeralType extends Type {
-  val methods = List()
+  val members = List()
 }
 
 case object IntType extends NumeralType {
@@ -9,5 +9,5 @@ case object IntType extends NumeralType {
 }
 
 case object FloatType extends NumeralType {
-  val name = "Int"
+  val name = "Float"
 }

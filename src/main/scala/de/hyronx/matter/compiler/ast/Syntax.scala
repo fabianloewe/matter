@@ -15,10 +15,25 @@ object SyntaxType {
 sealed trait SyntaxAST extends AST
 case class Declaration(varType: SyntaxType) extends SyntaxAST
 case class VariableUsage(name: String) extends SyntaxAST
-case class Concatenation(definitions: AST.Definitions) extends AST
-case class Range(from: Char, to: Char) extends SyntaxAST
-case class Selection(options: AST.Definitions) extends SyntaxAST
-case class Repeat(definition: AST) extends SyntaxAST
-case class RepeatOne(definition: AST) extends SyntaxAST
-case class Option(definition: AST) extends SyntaxAST
-case class Group(definition: AST) extends SyntaxAST
+case class Range(from: String, to: String) extends SyntaxAST
+
+sealed trait EnclosingMultiple extends SyntaxAST {
+  def definitions: AST.Definitions
+}
+object EnclosingMultiple {
+  def unapply(encl: EnclosingMultiple) = Some(encl.definitions)
+}
+
+case class Concatenation(definitions: AST.Definitions) extends EnclosingMultiple
+case class Selection(definitions: AST.Definitions) extends EnclosingMultiple
+
+sealed trait Enclosing extends SyntaxAST {
+  def definition: AST
+}
+object Enclosing {
+  def unapply(encl: Enclosing) = Some(encl.definition)
+}
+case class Repeat(definition: AST) extends Enclosing
+case class RepeatOne(definition: AST) extends Enclosing
+case class Option(definition: AST) extends Enclosing
+case class Group(definition: AST) extends Enclosing

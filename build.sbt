@@ -16,7 +16,8 @@ enablePlugins(JavaAppPackaging)
 
 resolvers ++= Seq(
   "Sonatype OSS Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
-  "SnakeYAML repositroy" at "http://oss.sonatype.org/content/groups/public/"
+  "SnakeYAML repository" at "http://oss.sonatype.org/content/groups/public/",
+  "jgit-repository" at "https://repo.eclipse.org/content/groups/releases/"
 )
 
 libraryDependencies ++= Seq(
@@ -40,7 +41,8 @@ libraryDependencies ++= Seq(
 
   "com.lihaoyi" %% "fastparse" % "0.4.2",
   "com.github.scopt" %% "scopt" % "3.5.0",
-  "org.yaml" % "snakeyaml" % "1.18"
+  "org.yaml" % "snakeyaml" % "1.18",
+  "org.eclipse.jgit" % "org.eclipse.jgit" % "4.7.0.201704051617-r"
 )
 
 scalacOptions ++= Seq(
@@ -69,3 +71,10 @@ ScalariformKeys.preferences := ScalariformKeys.preferences.value
   .setPreference(AlignSingleLineCaseStatements, true)
   .setPreference(DoubleIndentClassDeclaration, true)
   .setPreference(RewriteArrowSymbols, true)
+
+lazy val root = (project in file(".")).
+  enablePlugins(BuildInfoPlugin).
+  settings(
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
+    buildInfoPackage := "de.hyronx.matter"
+  )

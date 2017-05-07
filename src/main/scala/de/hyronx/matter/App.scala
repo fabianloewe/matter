@@ -6,6 +6,7 @@ import java.nio.file.Paths
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 
+import de.hyronx.matter.management._
 import de.hyronx.matter.compiler._
 
 object App extends scala.App {
@@ -38,6 +39,12 @@ object App extends scala.App {
         opt[File]('d', "dir").optional
           .valueName("<dir>")
           .action({ (dir, cfg) ⇒ cfg.copy(outDir = dir) }),
+        opt[String]('v', "vendor").optional
+          .valueName("<name>")
+          .action({ (name, cfg) ⇒ cfg.copy(vendor = Some(name)) }),
+        opt[String]('i', "initial-version").optional
+          .valueName("<version>")
+          .action({ (version, cfg) ⇒ cfg.copy(version = version) }),
         arg[String]("<project-name>").unbounded
           .action({ (name, cfg) ⇒ cfg.copy(packageName = name) })
       )
@@ -60,8 +67,11 @@ object App extends scala.App {
   parser.parse(args, Config()) match {
     case Some(cfg) ⇒ cfg.op match {
       case NewOp ⇒
+        // This config gets passed down to e.g. Project
+        implicit val config = cfg
+
         val projectPath = Paths.get(cfg.outDir.toString, cfg.packageName)
-        projectPath.toFile.mkdirs
+        Project.create(projectPath)
       case CompileOp ⇒
         // This config gets passed down to e.g. ParserGenerator
         implicit val config = cfg
@@ -69,14 +79,16 @@ object App extends scala.App {
 
         config.files foreach { file ⇒
           try {
-            Parser(Source.fromFile(file).mkString) match {
-              case Left(ParserError(msg)) ⇒ println("Parser failed: " + msg)
-              case Right(result) ⇒
+            Parser(Source.fromFile(file).mkString) fold (
+              { case ParserError(msg) ⇒ println(s"Parser failed: $msg") },
+              { result ⇒
                 printMatterTypes(result)
                 Generator(result)
-            }
+              }
+            )
           } catch {
             case e: java.io.FileNotFoundException ⇒ println(e.getMessage)
+            case e: CompilationError              ⇒ println(e.getMessage)
           }
         }
     }

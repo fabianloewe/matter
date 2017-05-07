@@ -11,5 +11,7 @@ case class Config(
   files: Seq[File] = Seq(),
   outDir: File = new File("."),
   buildDir: File = new File("build"),
-  packageName: String = ""
+  packageName: String = "",
+  vendor: Option[String] = None,
+  version: String = "0.0.1"
 )

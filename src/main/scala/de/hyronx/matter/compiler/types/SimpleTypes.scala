@@ -2,19 +2,21 @@ package de.hyronx.matter.compiler.types
 
 case object VoidType extends Type {
   val name = "Void"
-  val methods = List()
+  val members = List()
 }
 
 case object BoolType extends Type {
   val name = "Bool"
-  val methods = List()
+  val members = List()
 }
 
 case object CharType extends Type {
   val name = "Char"
-  val methods = List()
+  val members = List()
 }
 
-case class StructType(name: String) extends Type {
-  val methods = List()
+// This is a pseudo type to signal that the searched type could not be found yet.
+case object UnknownType extends Type {
+  val name = "Unknown"
+  val members = List()
 }

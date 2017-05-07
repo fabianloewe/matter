@@ -2,6 +2,8 @@ package de.hyronx.matter.compiler.types
 
 import java.lang.NumberFormatException
 
+import de.hyronx.matter.compiler.ast.Variable
+
 sealed trait Index
 case class MaxIndex(value: Int) extends Index
 case object Infinite extends Index
@@ -10,7 +12,7 @@ trait CollectionType extends Type {
   def wrappedTypes: Seq[Type]
   def maxIndex: Index
 
-  val methods = List(
+  val members = List(
     Method("not-empty", List(), BoolType),
 
     Method("contains", List(
@@ -28,7 +30,7 @@ trait CollectionType extends Type {
     ), VoidType)
   )
 
-  override def findMethod(name: String) = {
+  override def findMember(name: String) = {
     try {
       val index = name.toInt
       val retType = {
@@ -40,14 +42,13 @@ trait CollectionType extends Type {
 
       maxIndex match {
         case MaxIndex(maxIndexVal) if (index <= maxIndexVal) ⇒
-          Some(Method(name, List(), retType))
+          Some(Variable(name, retType))
         case Infinite ⇒
-          Some(Method(name, List(), retType))
+          Some(Variable(name, retType))
         case _ ⇒ None
       }
     } catch {
-      case e: NumberFormatException ⇒
-        methods find (_.name == name)
+      case e: NumberFormatException ⇒ members find (_.name == name)
     }
   }
 }

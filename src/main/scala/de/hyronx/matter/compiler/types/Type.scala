@@ -2,33 +2,27 @@ package de.hyronx.matter.compiler.types
 
 import scala.collection.mutable.ListBuffer
 
-import de.hyronx.matter.compiler.ast.TypeName
+import de.hyronx.matter.compiler.ast.{ TypeName, VariableLike, BaseBuiltIn, MatterType }
 
-class Argument(
+case class Argument(
   val name: String,
   val index: Int,
   val varType: Type
-)
+) extends VariableLike
 
-object Argument {
-  def apply(name: String, index: Int, varType: Type) = new Argument(name, index, varType)
-}
-
-class Method(
-  val name: String,
-  val args: List[Argument],
-  val retType: Type
-)
-
-object Method {
-  def apply(name: String, args: List[Argument], retType: Type) = new Method(name, args, retType)
+case class Method(
+    name: String,
+    args: List[Argument],
+    retType: Type
+) extends VariableLike {
+  val varType = retType
 }
 
 trait Type {
   def name: String
-  def methods: List[Method]
+  def members: Seq[VariableLike]
 
-  def findMethod(name: String): Option[Method] = methods find (_.name == name)
+  def findMember(name: String) = members find (_.name == name)
 }
 
 object Type {
@@ -36,6 +30,7 @@ object Type {
     StringType,
     OptionalType,
     ListType,
+    UnionType,
     TupleType,
     IntType,
     FloatType,
@@ -43,6 +38,12 @@ object Type {
     VoidType
   )
 
-  def apply(name: String): Option[Type] = types find (_.name == name)
-  def apply(name: TypeName): Option[Type] = types find (_.name == name.name)
+  def apply(name: String) = types find (_.name == name)
+  def apply(name: TypeName) = types find (_.name == name.name) match {
+    case None ⇒ BaseBuiltIn find name match {
+      case Some(matterType: MatterType) ⇒ Some(StructType(matterType))
+      case _                            ⇒ None
+    }
+    case found ⇒ found
+  }
 }

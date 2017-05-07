@@ -12,9 +12,9 @@ import de.hyronx.matter.library._
 
 import de.hyronx.matter.Config
 import de.hyronx.matter.compiler.Generator
+import de.hyronx.matter.compiler.Helpers._
 import de.hyronx.matter.compiler.types.Type
 import de.hyronx.matter.compiler.ast._
-import de.hyronx.matter.compiler.generators.Helpers._
 
 class ParserGenerator(
     matterType: MatterType,
@@ -32,10 +32,7 @@ class ParserGenerator(
   private val OPT_WRAPPER_SIG = s"($PARSER_TYPE)$PARSER_TYPE"
   private val REP_WRAPPER_SIG = s"(${PARSER_TYPE}ILscala/Option;II)$PARSER_TYPE"
 
-  def generateParser(
-    codeHandler: CodeHandler,
-    ast: AST
-  ): Unit = {
+  def generateParser(codeHandler: CodeHandler, ast: AST): Unit = {
     def generateMultipleParsers(defs: Seq[AST], funcName: String) = {
       val arrayVar = codeHandler.getFreshVar(s"[$PARSER_TYPE")
       codeHandler <<
@@ -94,7 +91,7 @@ class ParserGenerator(
           Comment("Create range parser") <<
           Ldc(from) <<
           Ldc(to) <<
-          InvokeStatic(WRAPPER_CLASS, "range", s"(CC)$PARSER_TYPE") <<
+          InvokeStatic(WRAPPER_CLASS, "range", s"($STRING_TYPE$STRING_TYPE)$PARSER_TYPE") <<
           Comment("Created range parser")
       case Concatenation(defs) ⇒
         println("ParserGenerator:generateParser! Creating concatenation parser")
@@ -147,6 +144,8 @@ class ParserGenerator(
     generateParser(methodCH, op)
     methodCH << ARETURN
     methodCH.freeze
+
+    MappingGenerator(matterType, parserClass)
   }
 
   def generate: ClassFile = {
@@ -164,7 +163,7 @@ class ParserGenerator(
         classFile.addField(PARSER_TYPE, parserVar)
           .setFlags(parserFlags)
 
-        val parserName = Helpers.capitalize(syntaxVar)
+        val parserName = syntaxVar.capitalize
 
         // Initialize static parser
         staticInitCH <<

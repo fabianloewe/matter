@@ -14,7 +14,7 @@ object Generator {
   def generate(matterType: MatterType)(implicit config: Config, pkg: Package) = {
     println(s"Generator:generate! Searching for $matterType")
     if (matterType.isAbstract)
-      throw new java.lang.RuntimeException(s"Matter type ${matterType.id} is abstract and cannot be generated.")
+      throw new GeneratorError(s"Matter type ${matterType.id} is abstract and cannot be generated.")
 
     pkg.findClass(matterType.id) match {
       case Some(foundClass) ⇒
@@ -38,6 +38,14 @@ object Generator {
     val mainMethodCH = mainClass.addMainMethod.codeHandler
     val stringVar = mainMethodCH.getFreshVar("Ljava/lang/String;")
     val parsedVar = mainMethodCH.getFreshVar("Lfastparse/core/Parsed;")
+
+    /* The corresponding code in Java:
+      public static void main(String[] args) {
+        String[] string = new String(Files.readAllBytes(Paths.get(args[0])));
+        Parser<?> parser = NumberAssignment.parse();
+        System.out.println(parser.parse().get().value().toString
+      }
+    */
     mainMethodCH <<
       New("java/lang/String") <<
       DUP <<
@@ -50,7 +58,7 @@ object Generator {
       InvokeStatic("java/nio/file/Files", "readAllBytes", "(Ljava/nio/file/Path;)[B") <<
       InvokeSpecial("java/lang/String", "<init>", "([B)V") <<
       AStore(stringVar) <<
-      InvokeStatic(s"${pkg.javaName}/Variable", "parse", "()Lfastparse/core/Parser;") <<
+      InvokeStatic(s"${pkg.javaName}/NumberAssignment", "parse", "()Lfastparse/core/Parser;") <<
       ALoad(stringVar) <<
       Ldc(0) <<
       ACONST_NULL <<
@@ -60,7 +68,6 @@ object Generator {
       ALoad(parsedVar) <<
       InvokeInterface("fastparse/core/Parsed", "get", "()Lfastparse/core/Parsed$Success;") <<
       InvokeVirtual("fastparse/core/Parsed$Success", "value", "()Ljava/lang/Object;") <<
-      //InvokeVirtual("java/lang/Object", "getClass", "()Ljava/lang/Class;") <<
       InvokeVirtual("java/lang/Object", "toString", "()Ljava/lang/String;") <<
       InvokeVirtual("java/io/PrintStream", "println", "(Ljava/lang/String;)V") <<
       RETURN
