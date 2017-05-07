@@ -63,7 +63,7 @@ scalacOptions ++= Seq(
     "-Ywarn-dead-code",
     "-Xfuture")
 
-initialCommands := "import de.hyronx.matter.compiler._"
+initialCommands := "import de.hyronx.matter._"
 
 SbtScalariform.scalariformSettings
 
