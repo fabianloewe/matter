@@ -32,12 +32,12 @@ sbt stage
 Now you should be able to run the Matter cli by entering:
 
 Linux / OS X:
-```
+```bash
 ./target/universal/stage/bin/matter-compiler
 ```
 
 Windows:
-```
+```batch
 .\target\universal\stage\bin\matter-compiler.bat
 ```
 
@@ -46,12 +46,12 @@ If you got any problems, please have a look at the [issue](README.md#Issue) sect
 ## Usage
 
 To create a new project:
-```
+```bash
 matter-compiler new <project-name>
 ```
 
 This will create a new directory in your current working directory called `<project-name>`. It should have the following structure:
-```
+```bash
 <project-name>
 |-- build
 |-- src
@@ -63,7 +63,7 @@ This will create a new directory in your current working directory called `<proj
 ```
 
 Now you can place your source files in `src/main/matter/<project-name>` and compile them by entering:
-```
+```bash
 matter-compiler compile
 ```
 which should result in some Java class files in the `build` directory.
