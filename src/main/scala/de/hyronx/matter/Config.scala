@@ -5,6 +5,7 @@ import java.io.File
 sealed trait CompilerOp
 case object CompileOp extends CompilerOp
 case object NewOp extends CompilerOp
+case object RunOp extends CompilerOp
 
 case class Config(
   op: CompilerOp = CompileOp,
@@ -13,5 +14,6 @@ case class Config(
   buildDir: File = new File("build"),
   packageName: String = "",
   vendor: Option[String] = None,
-  version: String = "0.0.1"
+  version: String = "0.0.1",
+  useGit: Boolean = true
 )

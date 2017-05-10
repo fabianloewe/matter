@@ -22,7 +22,7 @@ class ParserGenerator(
 )(
     implicit
     config: Config,
-    pkg: Package
+    pkg: PackageManager
 ) {
   //private val className = matterType.id + "$" + parserName + "Builder"
 
@@ -190,7 +190,7 @@ class ParserGenerator(
 }
 
 object ParserGenerator {
-  def apply(matterType: MatterType, classFile: ClassFile)(implicit config: Config, pkg: Package) = {
+  def apply(matterType: MatterType, classFile: ClassFile)(implicit config: Config, pkg: PackageManager) = {
     new ParserGenerator(matterType, classFile).generate
   }
 }

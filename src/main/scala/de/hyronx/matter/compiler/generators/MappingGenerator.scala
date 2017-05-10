@@ -20,7 +20,7 @@ class MappingGenerator(
 )(
     implicit
     config: Config,
-    pkg: Package
+    pkg: PackageManager
 ) {
   private def generateTypeSpecificCall(
     varType: Type,
@@ -167,6 +167,6 @@ object MappingGenerator {
   )(
     implicit
     config: Config,
-    pkg: Package
+    pkg: PackageManager
   ) = new MappingGenerator(matterType, pbClass).generate
 }

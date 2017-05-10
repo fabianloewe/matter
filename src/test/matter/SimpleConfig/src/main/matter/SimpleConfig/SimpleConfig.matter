@@ -1,6 +1,6 @@
 Variable < Matter:
   Syntax:
-    name = "a".."z" "V" { "a".."z" | "0".."9" | "-" | "_" }*
+    name = "a".."z" { "a".."z" | "0".."9" | "-" | "_" }*
   Mapping:
     name -> String
 

@@ -33,35 +33,108 @@ object App extends scala.App {
   val parser = new scopt.OptionParser[Config]("matter") {
     head("matter", "0.1")
 
-    cmd("new").action({ (_, cfg) ⇒ cfg.copy(op = NewOp) })
-      .text("Initializes a new Matter project")
+    cmd("new")
+      .text("Initializes a new Matter project.")
       .children(
-        opt[File]('d', "dir").optional
+        opt[File]('d', "dir")
+          .optional
+          .text("Creates the project in a different directory")
           .valueName("<dir>")
-          .action({ (dir, cfg) ⇒ cfg.copy(outDir = dir) }),
-        opt[String]('v', "vendor").optional
+          .action({ (dir, config) ⇒
+            config.copy(
+              outDir = dir,
+              buildDir = dir.toPath.resolve(config.buildDir.toPath).toFile
+            )
+          }),
+        opt[String]('v', "vendor")
+          .optional
+          .text("Initialize with vendor")
           .valueName("<name>")
-          .action({ (name, cfg) ⇒ cfg.copy(vendor = Some(name)) }),
-        opt[String]('i', "initial-version").optional
+          .action({ (name, config) ⇒ config.copy(vendor = Some(name)) }),
+        opt[String]('i', "initial-version")
+          .optional
+          .text("Initialize with version")
           .valueName("<version>")
-          .action({ (version, cfg) ⇒ cfg.copy(version = version) }),
-        arg[String]("<project-name>").unbounded
-          .action({ (name, cfg) ⇒ cfg.copy(packageName = name) })
-      )
+          .action({ (version, config) ⇒ config.copy(version = version) }),
+        opt[Unit]("no-git")
+          .optional
+          .text("Do not use Git for versioning")
+          .action({ (_, config) ⇒ config.copy(useGit = false) }),
+        arg[String]("<project-name>")
+          .unbounded
+          .text("Project to be created")
+          .action({ (name, config) ⇒ config.copy(packageName = name) })
+      ).action({ (_, config) ⇒ config.copy(op = NewOp) })
 
-    cmd("compile").action({ (_, cfg) ⇒ cfg.copy(op = CompileOp) })
-      .text("compile is a command")
+    cmd("compile")
+      .text("Compiles the current project or specified files.")
       .children(
-        opt[String]("package").optional
+        opt[File]('d', "dir")
+          .optional
+          .text("Compiles a project in a different directory")
+          .valueName("<dir>")
+          .action({ (dir, config) ⇒
+            config.copy(
+              outDir = dir,
+              buildDir = dir.toPath.resolve(config.buildDir.toPath).toFile,
+              packageName = dir.toPath.getFileName().toString
+            )
+          }),
+        opt[String]('p', "package")
+          .optional
           .text("Overwrites the package name")
           .valueName("<capitalized-name>")
-          .action({ (name, cfg) ⇒ cfg.copy(packageName = name) }),
-        opt[File]("build-dir").optional
+          .action({ (name, config) ⇒ config.copy(packageName = name) }),
+        opt[File]('o', "build-dir")
+          .optional
+          .text("Uses a different build directory")
           .valueName("<dir>")
-          .action({ (dir, cfg) ⇒ cfg.copy(buildDir = dir) }),
-        arg[File]("<file>...").unbounded
-          .action({ (file, cfg) ⇒ cfg.copy(files = cfg.files :+ file) })
-      )
+          .action({ (dir, config) ⇒ config.copy(buildDir = dir) }),
+        opt[Unit]("no-git")
+          .optional
+          .text("Do not use Git for versioning")
+          .action({ (_, config) ⇒ config.copy(useGit = false) }),
+        arg[File]("<file>...")
+          .optional
+          .unbounded
+          .text("Files to be compiled")
+          .action({ (file, config) ⇒ config.copy(files = config.files :+ file) })
+      ).action({ (_, config) ⇒ config.copy(op = CompileOp) })
+
+    cmd("run")
+      .text("Runs the current project.")
+      .children(
+        opt[File]('d', "dir")
+          .optional
+          .text("Searches for a project in a different directory")
+          .valueName("<dir>")
+          .action({ (dir, config) ⇒
+            config.copy(
+              outDir = dir,
+              buildDir = dir.toPath.resolve(config.buildDir.toPath).toFile,
+              packageName = dir.toPath.getFileName().toString
+            )
+          }),
+        opt[String]('p', "package")
+          .optional
+          .text("Overwrites the package name")
+          .valueName("<capitalized-name>")
+          .action({ (name, config) ⇒ config.copy(packageName = name) }),
+        opt[File]('o', "build-dir")
+          .optional
+          .text("Uses a different build directory")
+          .valueName("<dir>")
+          .action({ (dir, config) ⇒ config.copy(buildDir = dir) }),
+        opt[Unit]("no-git")
+          .optional
+          .text("Do not use Git for versioning")
+          .action({ (_, config) ⇒ config.copy(useGit = false) }),
+        arg[File]("<file>...")
+          .optional
+          .unbounded
+          .text("Files to be passed to the executed program")
+          .action({ (file, config) ⇒ config.copy(files = config.files :+ file) })
+      ).action({ (_, config) ⇒ config.copy(op = RunOp) })
   }
 
   parser.parse(args, Config()) match {
@@ -70,14 +143,24 @@ object App extends scala.App {
         // This config gets passed down to e.g. Project
         implicit val config = cfg
 
-        val projectPath = Paths.get(cfg.outDir.toString, cfg.packageName)
+        val projectPath = Paths.get(config.outDir.toString, config.packageName)
         Project.create(projectPath)
       case CompileOp ⇒
         // This config gets passed down to e.g. ParserGenerator
         implicit val config = cfg
-        config.buildDir.mkdirs
 
-        config.files foreach { file ⇒
+        // Open the project
+        val projectDir = config.outDir.toPath
+        val project = Project.open(projectDir.toAbsolutePath())
+
+        // Create the build directory in project directory
+        projectDir.resolve(config.buildDir.toPath).toFile.mkdirs
+
+        // Get source files to compile
+        val files = if (config.files.isEmpty) project.matterSources else config.files
+
+        // Compile each file
+        files foreach { file ⇒
           try {
             Parser(Source.fromFile(file).mkString) fold (
               { case ParserError(msg) ⇒ println(s"Parser failed: $msg") },
@@ -91,6 +174,22 @@ object App extends scala.App {
             case e: CompilationError              ⇒ println(e.getMessage)
           }
         }
+      case RunOp ⇒
+        import sys.process._
+
+        val config = cfg
+        val dir = config.outDir.toPath
+        val compilerPath = java.lang.System.getProperty("user.dir")
+
+        val result = s"scala -cp $compilerPath/target/universal/stage/lib/com.lihaoyi.fastparse_2.12-0.4.2.jar:" +
+          s"$compilerPath/target/universal/stage/lib/com.lihaoyi.fastparse-utils_2.12-0.4.2.jar:" +
+          s"$compilerPath/target/universal/stage/lib/com.lihaoyi.sourcecode_2.12-0.1.3.jar:" +
+          s"$compilerPath/target/universal/stage/lib/de.hyronx.matter-compiler-0.0.1.jar:" +
+          s"${config.buildDir.toPath.toAbsolutePath()} " +
+          s"${config.packageName}.Compiler " +
+          s"${config.files.mkString(" ")}"
+        //println(s"Command: $result")
+        println(s"Result: ${result.!}")
     }
     case None ⇒
       println("The command line arguments are not correctly provided")

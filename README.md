@@ -9,7 +9,7 @@ Wether you want to work on an existing programming language or create your own o
 
 * Static typed and [type-inferred](https://en.wikipedia.org/wiki/Type_inference) language
 * Simple syntax inspired by Ruby and Python
-* Clear seperation of each part \(_parsing_, _AST generation_ and _compilation_\) while still keeping all together in its type \(see the [Documentation](https://www.gitbook.com/book/hyronx/matter-lang/details)\)
+* Clear seperation of each part \(_parsing_, _AST generation_ and _compilation_\) while still keeping all together in its type \(see the [documentation](https://www.gitbook.com/book/hyronx/matter-lang/details)\)
 * Extendable compilation support for machine code, the JVM, etc. \(through the [Compiler](https://www.gitbook.com/book/hyronx/matter-lang/details) interface\)
 
 #### Management
@@ -18,6 +18,12 @@ Wether you want to work on an existing programming language or create your own o
 * Shareable and managed compiler backend packages
 * Browseable package registry
 * Automatically Git versioned
+
+## Dependencies
+
+- [git](https://git-scm.com/downloads) - For cloning the repository
+- [sbt](http://www.scala-sbt.org/download.html) - For compiling Matter itself
+- [scala](https://www.scala-lang.org/download/) - For running Matter apps
 
 ## Installation
 
@@ -44,6 +50,7 @@ Windows:
 If you got any problems, please have a look at the [issue](README.md#Issue) section.
 
 ## Usage
+#### Setup
 
 To create a new project:
 ```bash
@@ -51,7 +58,7 @@ matter-compiler new <project-name>
 ```
 
 This will create a new directory in your current working directory called `<project-name>`. It should have the following structure:
-```bash
+```
 <project-name>
 |-- build
 |-- src
@@ -62,30 +69,30 @@ This will create a new directory in your current working directory called `<proj
 `-- config.yaml
 ```
 
+#### Compilation
+
 Now you can place your source files in `src/main/matter/<project-name>` and compile them by entering:
 ```bash
 matter-compiler compile
 ```
 which should result in some Java class files in the `build` directory.
 
-Executing your compiler/parser/etc. is currently quite complicated:
-```bash
-# Move to the directory where Matter is located
-cd..  
-# Run java
-java -cp matter/target/universal/stage/lib/com.lihaoyi.fastparse_2.12-0.4.2.jar:\ # the internal parser library
-matter/target/universal/stage/lib/com.lihaoyi.fastparse-utils_2.12-0.4.2.jar:\ # the internal parser library
-matter/target/universal/stage/lib/com.lihaoyi.sourcecode_2.12-0.1.3.jar:\ # the internal parser library
-matter/target/universal/stage/lib/de.hyronx.matter-compiler-0.0.1.jar:\ # some support classes
-matter/target/universal/stage/lib/org.scala-lang.scala-library-2.12.1.jar:\ # Scala language runtime
-<project-name>/build/ \
-<project-name>.Compiler \
-<file-to-parse>
-```
+#### Execution
 
-I will improve this as soon as all basic features are implemented.
+You can execute your compiler/parser/etc. by entering:
+```bash
+matter-compiler run <file-to-parse>
+```
+where `<file-to-parse>` is the file to be parsed by your Matter app.
 
 Again if you got any problems, please have a look at the next section.
+
+To find out more about the available options for Matter have a look at the [documentation](https://www.gitbook.com/book/hyronx/matter-lang/details).
+
+## Examples
+
+Checkout the `src/test/matter` directory where you can find multiple small examples
+of how Matter apps can look like.
 
 ## Issue
 

@@ -2,7 +2,7 @@ package de.hyronx.matter.compiler
 
 import scala.collection.mutable.ListBuffer
 
-import cafebabe.Package
+import cafebabe.PackageManager
 import cafebabe.ByteCodes._
 import cafebabe.AbstractByteCodes._
 
@@ -11,7 +11,7 @@ import de.hyronx.matter.compiler.ast.{ MatterTypeTree, MatterType }
 import de.hyronx.matter.compiler.generators._
 
 object Generator {
-  def generate(matterType: MatterType)(implicit config: Config, pkg: Package) = {
+  def generate(matterType: MatterType)(implicit config: Config, pkg: PackageManager) = {
     println(s"Generator:generate! Searching for $matterType")
     if (matterType.isAbstract)
       throw new GeneratorError(s"Matter type ${matterType.id} is abstract and cannot be generated.")
@@ -27,7 +27,7 @@ object Generator {
   }
 
   def apply(base: MatterTypeTree)(implicit config: Config) = {
-    implicit val pkg = new Package(config.packageName)
+    implicit val pkg = new PackageManager(config.packageName)
 
     base.children
       .collect { case child: MatterType if !child.isAbstract ⇒ child }
@@ -73,6 +73,6 @@ object Generator {
       RETURN
     mainMethodCH.freeze
 
-    pkg.writeTo(config.buildDir.toString)
+    pkg.writeTo(config.buildDir.toPath)
   }
 }
