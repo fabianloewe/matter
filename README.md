@@ -1,6 +1,8 @@
 # The Matter Language
 
-Matter is a _compiler creation language \(a [DSL](https://en.wikipedia.org/wiki/Domain-specific_language)\)_ for easily building parsers, [ASTs](https://en.wikipedia.org/wiki/Abstract_syntax_tree), interpreters and, of course, compilers in one simple language.
+[![Join the chat at https://gitter.im/matter-lang/Lobby](https://badges.gitter.im/matter-lang/Lobby.svg)](https://gitter.im/matter-lang/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
+Matter is a _compiler creating language \(a [DSL](https://en.wikipedia.org/wiki/Domain-specific_language)\)_ for easily building parsers, [ASTs](https://en.wikipedia.org/wiki/Abstract_syntax_tree), interpreters and, of course, compilers in one simple language. Wether you want to work on an existing programming language or create your own one, Matter helps you and saves you time.
 
 Wether you want to work on an existing programming language or create your own one, Matter helps you and saves you time.
 
