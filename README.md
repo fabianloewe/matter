@@ -29,8 +29,7 @@ Wether you want to work on an existing programming language or create your own o
 
 ## Installation
 
-Download and install [sbt](http://www.scala-sbt.org/download.html).
-Then clone this repository:
+Clone this repository:
 ```bash
 git clone https://github.com/hyronx/matter
 cd matter
