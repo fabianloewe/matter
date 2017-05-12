@@ -31,7 +31,7 @@ object App extends scala.App {
   }
 
   val parser = new scopt.OptionParser[Config]("matter") {
-    head("matter", "0.1")
+    head("matter", BuildInfo.version)
 
     cmd("new")
       .text("Initializes a new Matter project.")
@@ -151,29 +151,32 @@ object App extends scala.App {
 
         // Open the project
         val projectDir = config.outDir.toPath
-        val project = Project.open(projectDir.toAbsolutePath())
+        Project.open(projectDir.toAbsolutePath()) fold (
+          { error ⇒ ErrorHandler(error, "Project configuration", "config.yaml") },
+          { project ⇒
+            // Create the build directory in project directory
+            projectDir.resolve(config.buildDir.toPath).toFile.mkdirs
 
-        // Create the build directory in project directory
-        projectDir.resolve(config.buildDir.toPath).toFile.mkdirs
+            // Get source files to compile
+            val files = if (config.files.isEmpty) project.matterSources else config.files
 
-        // Get source files to compile
-        val files = if (config.files.isEmpty) project.matterSources else config.files
-
-        // Compile each file
-        files foreach { file ⇒
-          try {
-            Parser(Source.fromFile(file).mkString) fold (
-              { case ParserError(msg) ⇒ println(s"Parser failed: $msg") },
-              { result ⇒
-                printMatterTypes(result)
-                Generator(result)
+            // Compile each file
+            files foreach { file ⇒
+              try {
+                Parser(Source.fromFile(file).mkString) fold (
+                  { case ParserError(msg) ⇒ println(s"Parser failed: $msg") },
+                  { result ⇒
+                    printMatterTypes(result)
+                    Generator(result)
+                  }
+                )
+              } catch {
+                case e: java.io.FileNotFoundException ⇒ println(e.getMessage)
+                case e: CompilationError              ⇒ println(e.getMessage)
               }
-            )
-          } catch {
-            case e: java.io.FileNotFoundException ⇒ println(e.getMessage)
-            case e: CompilationError              ⇒ println(e.getMessage)
+            }
           }
-        }
+        )
       case RunOp ⇒
         import sys.process._
 
