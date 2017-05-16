@@ -1,7 +1,7 @@
 package de.hyronx.matter
 
 import java.io.File
-import java.nio.file.Paths
+import java.nio.file.{ Path, Paths }
 
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
@@ -27,6 +27,13 @@ object App extends scala.App {
 
     matterType.children foreach { child ⇒
       printMatterTypes(child, indent + 2)
+    }
+  }
+
+  def compileSources(tool: BuildTool, projectPath: Path, srcs: Seq[File] = Seq()) = {
+    import sys.process._
+    tool match {
+      case BuildTool.Sbt ⇒ Seq("/bin/sh", "-c", s"cd ${projectPath.normalize().toAbsolutePath()}; sbt compile").!
     }
   }
 
@@ -151,28 +158,40 @@ object App extends scala.App {
 
         // Open the project
         val projectDir = config.outDir.toPath
-        Project.open(projectDir.toAbsolutePath()) fold (
-          { error ⇒ ErrorHandler(error, "Project configuration", "config.yaml") },
+        Project.open(projectDir.normalize().toAbsolutePath()) fold (
+          { error ⇒ ErrorHandler(error, "Project configuration", Some("config.yaml")) },
           { project ⇒
             // Create the build directory in project directory
             projectDir.resolve(config.buildDir.toPath).toFile.mkdirs
 
             // Get source files to compile
-            val files = if (config.files.isEmpty) project.matterSources else config.files
+            val sources = {
+              if (config.files.isEmpty)
+                project.sources
+              else
+                project.sources + (Language.Matter → config.files)
+            }
 
-            // Compile each file
-            files foreach { file ⇒
-              try {
-                Parser(Source.fromFile(file).mkString) fold (
-                  { case ParserError(msg) ⇒ println(s"Parser failed: $msg") },
-                  { result ⇒
-                    printMatterTypes(result)
-                    Generator(result)
-                  }
-                )
-              } catch {
-                case e: java.io.FileNotFoundException ⇒ println(e.getMessage)
-                case e: CompilationError              ⇒ println(e.getMessage)
+            if (sources.isEmpty)
+              ErrorHandler("No sources specified", "Command execution")
+
+            // Compile supported source files
+            sources foreach {
+              case (Language.Scala, _) ⇒ compileSources(BuildTool.Sbt, projectDir)
+              case (Language.Java, _)  ⇒ compileSources(BuildTool.Sbt, projectDir)
+              case (Language.Matter, files) ⇒ files foreach { file ⇒
+                try {
+                  Parser(Source.fromFile(file).mkString) fold (
+                    { case ParserError(msg) ⇒ println(s"Parser failed: $msg") },
+                    { result ⇒
+                      printMatterTypes(result)
+                      Generator(result)
+                    }
+                  )
+                } catch {
+                  case e: java.io.FileNotFoundException ⇒ println(e.getMessage)
+                  case e: CompilationError              ⇒ println(e.getMessage)
+                }
               }
             }
           }

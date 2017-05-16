@@ -17,7 +17,7 @@ import de.hyronx.matter.{ Config, BuildInfo }
 class Project private (
     project: ProjectConfig,
     val git: Option[Git] = None,
-    val matterSources: Seq[File] = Seq()
+    val sources: Map[Language, Seq[File]] = Map()
 ) {
   val matterVersion = project.matter.version
 
@@ -146,17 +146,45 @@ object Project {
   }
 
   def open(path: Path)(implicit config: Config): Either[Error, Project] = {
+    import java.nio.file.FileVisitResult._
+
     val git = if (config.useGit) Some(Git.open(path.toFile)) else None
 
-    var files = List.empty[File]
-    val srcDir = Paths.get(path.toString, "src", "main", "matter", config.packageName)
+    // TODO: Use immutable Map and functional code
+    val files = collection.mutable.Map.empty[Language, Seq[File]]
+    val srcDir = Paths.get(path.toString, "src", "main")
+    var flag: Option[Language] = None
     Files.walkFileTree(srcDir, new SimpleFileVisitor[Path]() {
       override def visitFile(file: Path, attributes: BasicFileAttributes) = {
-        files = files :+ file.toFile
-        FileVisitResult.CONTINUE
+        if (attributes.isRegularFile()) {
+          val fileName = file.getFileName().toString
+          if (fileName.endsWith(".matter")) {
+            files get Language.Matter match {
+              case Some(srcs) ⇒ files(Language.Matter) = srcs :+ file.toFile
+              case None       ⇒ files(Language.Matter) = file.toFile :: List()
+            }
+            CONTINUE
+          } else if (fileName.endsWith(".scala")) {
+            files get Language.Scala match {
+              case Some(srcs) ⇒ files(Language.Scala) = srcs :+ file.toFile
+              case None       ⇒ files(Language.Scala) = file.toFile :: List()
+            }
+            CONTINUE
+          } else if (fileName.endsWith(".java")) {
+            files get Language.Java match {
+              case Some(srcs) ⇒ files(Language.Java) = srcs :+ file.toFile
+              case None       ⇒ files(Language.Java) = file.toFile :: List()
+            }
+            CONTINUE
+          } else {
+            SKIP_SIBLINGS
+          }
+        } else {
+          CONTINUE
+        }
       }
     })
 
-    readConfig(path) map { config ⇒ new Project(config, git, files) }
+    readConfig(path) map { config ⇒ new Project(config, git, files.toMap) }
   }
 }
