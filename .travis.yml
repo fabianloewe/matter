@@ -2,3 +2,4 @@ language: scala
 scala:
   - 2.11.8
   - 2.12.2
+sbt_args: -target:jvm-1.8
