@@ -1,11 +1,8 @@
 package de.hyronx.matter.compiler.parsers
 
-import scala.collection.mutable.ListBuffer
-
 import de.hyronx.matter.compiler.ast
 
 trait BaseParser {
-  import Indentation._
   import fastparse.all._
 
   def deeper(indent: Option[Indentation], parent: ast.MatterTypeTree) = {

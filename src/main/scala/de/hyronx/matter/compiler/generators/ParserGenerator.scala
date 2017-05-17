@@ -1,19 +1,12 @@
 package de.hyronx.matter.compiler.generators
 
-import scala.collection.mutable.Map
-
 import cafebabe._
 import cafebabe.ByteCodes._
 import cafebabe.AbstractByteCodes._
 
-import fastparse.all.P
-
-import de.hyronx.matter.library._
-
 import de.hyronx.matter.Config
 import de.hyronx.matter.compiler.Generator
 import de.hyronx.matter.compiler.Helpers._
-import de.hyronx.matter.compiler.types.Type
 import de.hyronx.matter.compiler.ast._
 
 class ParserGenerator(
@@ -171,7 +164,7 @@ class ParserGenerator(
           InvokeStatic(WRAPPER_CLASS, "buildParser", s"(Lde/hyronx/matter/library/ParserBuilder;)$PARSER_TYPE") <<
           PutStatic(classFile.className, parserVar, PARSER_TYPE)
 
-        val parserBuilder = generateParserBuilder(parserName, op)
+        generateParserBuilder(parserName, op)
         parserVar
     }.last
 

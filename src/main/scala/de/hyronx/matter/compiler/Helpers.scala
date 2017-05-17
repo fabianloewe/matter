@@ -1,7 +1,5 @@
 package de.hyronx.matter.compiler
 
-import scala.reflect._
-
 import de.hyronx.matter.compiler.types._
 import de.hyronx.matter.compiler.ast.{ AST, MatterTypeTree, MatterType, BaseBuiltIn }
 

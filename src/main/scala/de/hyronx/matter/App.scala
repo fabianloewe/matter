@@ -3,7 +3,6 @@ package de.hyronx.matter
 import java.io.File
 import java.nio.file.{ Path, Paths }
 
-import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 
 import de.hyronx.matter.management._
@@ -200,7 +199,6 @@ object App extends scala.App {
         import sys.process._
 
         val config = cfg
-        val dir = config.outDir.toPath
         val compilerPath = java.lang.System.getProperty("user.dir")
 
         val result = s"scala -cp $compilerPath/target/universal/stage/lib/com.lihaoyi.fastparse_2.12-0.4.2.jar:" +

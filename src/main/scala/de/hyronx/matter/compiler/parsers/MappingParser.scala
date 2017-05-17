@@ -1,8 +1,5 @@
 package de.hyronx.matter.compiler.parsers
 
-import java.util.NoSuchElementException
-
-import de.hyronx.matter.compiler.ParserError
 import de.hyronx.matter.compiler.Helpers._
 import de.hyronx.matter.compiler.ast._
 import de.hyronx.matter.compiler.types._

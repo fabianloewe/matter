@@ -1,7 +1,5 @@
 package de.hyronx.matter.compiler
 
-import scala.collection.mutable.ListBuffer
-
 import de.hyronx.matter.Config
 import de.hyronx.matter.compiler.ast._
 import de.hyronx.matter.compiler.parsers._

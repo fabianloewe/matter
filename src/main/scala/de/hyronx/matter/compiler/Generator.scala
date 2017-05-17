@@ -1,7 +1,5 @@
 package de.hyronx.matter.compiler
 
-import scala.collection.mutable.ListBuffer
-
 import cafebabe.PackageManager
 import cafebabe.ByteCodes._
 import cafebabe.AbstractByteCodes._

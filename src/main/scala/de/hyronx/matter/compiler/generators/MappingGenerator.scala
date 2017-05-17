@@ -1,15 +1,10 @@
 package de.hyronx.matter.compiler.generators
 
-import scala.collection.mutable.Map
-
 import cafebabe._
 import cafebabe.ByteCodes._
 import cafebabe.AbstractByteCodes._
 
-import de.hyronx.matter.library._
-
-import de.hyronx.matter.Config
-import de.hyronx.matter.compiler.{ Generator, GeneratorError }
+import de.hyronx.matter.compiler.GeneratorError
 import de.hyronx.matter.compiler.Helpers._
 import de.hyronx.matter.compiler.types._
 import de.hyronx.matter.compiler.ast._
@@ -17,10 +12,6 @@ import de.hyronx.matter.compiler.ast._
 class MappingGenerator(
     matterType: MatterType,
     pbClass: ClassFile
-)(
-    implicit
-    config: Config,
-    pkg: PackageManager
 ) {
   private def generateTypeSpecificCall(
     varType: Type,
@@ -164,9 +155,5 @@ object MappingGenerator {
   def apply(
     matterType: MatterType,
     pbClass: ClassFile
-  )(
-    implicit
-    config: Config,
-    pkg: PackageManager
   ) = new MappingGenerator(matterType, pbClass).generate
 }

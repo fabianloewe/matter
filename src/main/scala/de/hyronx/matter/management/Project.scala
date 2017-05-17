@@ -1,7 +1,7 @@
 package de.hyronx.matter.management
 
 import java.io.{ File, FileWriter, FileReader }
-import java.nio.file.{ Path, Paths, Files, SimpleFileVisitor, FileVisitResult }
+import java.nio.file.{ Path, Paths, Files, SimpleFileVisitor }
 import java.nio.file.attribute.BasicFileAttributes
 
 import org.yaml.snakeyaml.Yaml
@@ -16,7 +16,7 @@ import de.hyronx.matter.{ Config, BuildInfo }
 
 class Project private (
     project: ProjectConfig,
-    val git: Option[Git] = None,
+    val git: Option[Git],
     val sources: Map[Language, Seq[File]] = Map()
 ) {
   val matterVersion = project.matter.version
@@ -153,7 +153,6 @@ object Project {
     // TODO: Use immutable Map and functional code
     val files = collection.mutable.Map.empty[Language, Seq[File]]
     val srcDir = Paths.get(path.toString, "src", "main")
-    var flag: Option[Language] = None
     Files.walkFileTree(srcDir, new SimpleFileVisitor[Path]() {
       override def visitFile(file: Path, attributes: BasicFileAttributes) = {
         if (attributes.isRegularFile()) {

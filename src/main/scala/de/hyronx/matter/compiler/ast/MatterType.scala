@@ -88,8 +88,6 @@ case class MatterType(
     children: Set[MatterTypeTree],
     var isAbstract: Boolean
 ) extends MatterTypeTree {
-  import fastparse.all._
-
   this.children ++= ancestor.children map (_.clone(Some(this)))
   println(s"MatterType:addChildren! Children: ${this.children map { x ⇒ (x.id, x.parent.id) }}")
 

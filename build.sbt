@@ -1,67 +1,8 @@
 import scalariform.formatter.preferences._
 import com.typesafe.sbt.SbtScalariform
 import com.typesafe.sbt.SbtScalariform.ScalariformKeys
-
-name := "matter.compiler"
-
-organization := "de.hyronx"
-
-version := "0.0.1"
-
-scalaVersion := "2.12.1"
-
-crossScalaVersions := Seq("2.11.8", "2.12.1")
-
-enablePlugins(JavaAppPackaging)
-
-resolvers ++= Seq(
-  "Sonatype OSS Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
-  "SnakeYAML repository" at "http://oss.sonatype.org/content/groups/public/",
-  "jgit-repository" at "https://repo.eclipse.org/content/groups/releases/"
-)
-
-libraryDependencies ++= Seq(
-
-  //"com.chuusai" %% "shapeless" % "2.3.2",
-  //"org.typelevel" %% "cats" % "0.8.0",
-
-  //"com.typesafe.akka" %% "akka-actor" % "2.4.12",
-  //"com.typesafe.akka" %% "akka-slf4j" % "2.4.12",
-  //"com.typesafe.akka" %% "akka-stream" % "2.4.12",
-  //"com.typesafe.akka" %% "akka-stream-testkit" % "2.4.12",
-  //"com.typesafe.akka" %% "akka-testkit" % "2.4.12" % "test",
-
-  //"com.typesafe.akka" %% "akka-http-core" % "2.4.11",
-  //"com.typesafe.akka" %% "akka-http-experimental" % "2.4.11",
-  //"com.typesafe.akka" %% "akka-http-spray-json-experimental" % "2.4.11",
-  //"com.typesafe.akka" %% "akka-http-testkit" % "2.4.11",
-
-  "org.scalatest" %% "scalatest" % "3.0.0" % "test",
-  "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
-
-  "com.lihaoyi" %% "fastparse" % "0.4.2",
-  "com.github.scopt" %% "scopt" % "3.5.0",
-  "org.yaml" % "snakeyaml" % "1.18",
-  "org.eclipse.jgit" % "org.eclipse.jgit" % "4.7.0.201704051617-r"
-)
-
-scalacOptions ++= Seq(
-    "-target:jvm-1.8",
-    "-deprecation",
-    "-encoding", "UTF-8",
-    "-feature",
-    "-language:existentials",
-    "-language:higherKinds",
-    "-language:implicitConversions",
-    "-language:experimental.macros",
-    "-unchecked",
-    //"-Ywarn-unused-import",
-    "-Ywarn-nullary-unit",
-    "-Xfatal-warnings",
-    "-Xlint",
-    //"-Yinline-warnings",
-    "-Ywarn-dead-code",
-    "-Xfuture")
+import Resolvers._
+import Dependencies._
 
 initialCommands := "import de.hyronx.matter._"
 
@@ -73,8 +14,34 @@ ScalariformKeys.preferences := ScalariformKeys.preferences.value
   .setPreference(RewriteArrowSymbols, true)
 
 lazy val root = (project in file(".")).
-  enablePlugins(BuildInfoPlugin).
+  enablePlugins(JavaAppPackaging, BuildInfoPlugin).
   settings(
+    name := "matter",
+    organization := "de.hyronx",
+    version := "0.0.1",
+    scalaVersion := "2.12.2",
+    crossScalaVersions := Seq("2.11.8", "2.12.2"),
+    logLevel := Level.Warn,
+
+    resolvers ++= Seq(
+      releases,
+      sonatypeSnapshot,
+      snakeYamlRepo,
+      jgitRepo
+    ),
+
+    libraryDependencies ++= Seq(
+      scalaTest,
+      scalaCheck,
+      fastparse,
+      scopt,
+      snakeYaml,
+      jgit
+    ),
+
+    scalacOptions ++= CompileOptions.options,
+
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
     buildInfoPackage := "de.hyronx.matter"
   )
+  .dependsOn(RootProject(uri("git://github.com/hyronx/cafebabe")))

@@ -4,13 +4,11 @@ import cafebabe._
 import cafebabe.ByteCodes._
 import cafebabe.AbstractByteCodes._
 
-import de.hyronx.matter.Config
-
 import de.hyronx.matter.compiler.Helpers._
-import de.hyronx.matter.compiler.ast.{ MatterType, MatterBuiltIn }
+import de.hyronx.matter.compiler.ast.MatterType
 import de.hyronx.matter.compiler.types.Type
 
-class ClassGenerator(matterType: MatterType)(implicit config: Config, pkg: PackageManager) {
+class ClassGenerator(matterType: MatterType)(implicit pkg: PackageManager) {
   /*private val ancestor = matterType.ancestor match {
     case MatterBuiltIn ⇒ None
     case _             ⇒ Some(matterType.ancestor.id)
@@ -156,6 +154,6 @@ class ClassGenerator(matterType: MatterType)(implicit config: Config, pkg: Packa
 }
 
 object ClassGenerator {
-  def apply(matterType: MatterType)(implicit config: Config, pkg: PackageManager) =
+  def apply(matterType: MatterType)(implicit pkg: PackageManager) =
     new ClassGenerator(matterType).generate
 }
