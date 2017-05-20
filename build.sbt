@@ -44,4 +44,4 @@ lazy val root = (project in file(".")).
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
     buildInfoPackage := "de.hyronx.matter"
   )
-  .dependsOn(RootProject(uri("git://github.com/hyronx/cafebabe")))
+  .dependsOn(RootProject(uri("https://github.com/hyronx/cafebabe.git")))

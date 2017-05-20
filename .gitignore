@@ -19,5 +19,7 @@ projectFilesBackup/
 .settings
 .project
 .classpath
+.ensime
+.ensime_cache/
 version.properties
 RUNNING_PID
