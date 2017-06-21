@@ -1,31 +1,20 @@
 package de.hyronx.matter.compiler.ast
 
-trait SyntaxType {
-  def name: String
-}
-object SyntaxType {
-  case object String extends SyntaxType {
-    val name = "String"
-  }
-  case object Grammar extends SyntaxType {
-    val name = "Grammar"
-  }
-}
-
 sealed trait SyntaxAST extends AST
-case class Declaration(varType: SyntaxType) extends SyntaxAST
+case class Declaration(typeName: TypeName) extends SyntaxAST
 case class VariableUsage(name: String) extends SyntaxAST
+case class TypeConstruction(name: TypeName, genericTypes: Seq[TypeName] = Seq(), params: Seq[Variable] = Seq()) extends AST
 case class Range(from: String, to: String) extends SyntaxAST
 
 sealed trait EnclosingMultiple extends SyntaxAST {
-  def definitions: AST.Definitions
+  def definitions: Seq[AST]
 }
 object EnclosingMultiple {
   def unapply(encl: EnclosingMultiple) = Some(encl.definitions)
 }
 
-case class Concatenation(definitions: AST.Definitions) extends EnclosingMultiple
-case class Selection(definitions: AST.Definitions) extends EnclosingMultiple
+case class Concatenation(definitions: Seq[AST]) extends EnclosingMultiple
+case class Selection(definitions: Seq[AST]) extends EnclosingMultiple
 
 sealed trait Enclosing extends SyntaxAST {
   def definition: AST

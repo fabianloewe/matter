@@ -12,9 +12,9 @@ object Generator {
   def generate(matterType: MatterType)(implicit config: Config, pkg: PackageManager) = {
     println(s"Generator:generate! Searching for $matterType")
     if (matterType.isAbstract)
-      throw new GeneratorError(s"Matter type ${matterType.id} is abstract and cannot be generated.")
+      throw new GeneratorError(s"Matter type ${matterType.name} is abstract and cannot be generated.")
 
-    pkg.findClass(matterType.id) match {
+    pkg.findClass(matterType.name) match {
       case Some(foundClass) ⇒
         println("Generator:generate! Found!")
         foundClass

@@ -21,5 +21,5 @@ object Dependencies {
     lazy val scopt = "com.github.scopt" %% "scopt" % "3.5.0"
     lazy val snakeYaml = "org.yaml" % "snakeyaml" % "1.18"
     lazy val jgit = "org.eclipse.jgit" % "org.eclipse.jgit" % "4.7.0.201704051617-r"
-
+    lazy val scalaz = "org.scalaz" %% "scalaz-core" % "7.2.13"
 }

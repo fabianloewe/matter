@@ -17,7 +17,7 @@ class ParserGenerator(
     config: Config,
     pkg: PackageManager
 ) {
-  //private val className = matterType.id + "$" + parserName + "Builder"
+  //private val className = matterType.name + "$" + parserName + "Builder"
 
   private val PARSER_CLASS = "fastparse/core/Parser"
   private val PARSER_TYPE = s"L${PARSER_CLASS};"
@@ -100,12 +100,12 @@ class ParserGenerator(
           InvokeStatic(WRAPPER_CLASS, "literal", s"(Ljava/lang/String;)$PARSER_TYPE") <<
           Comment("Created simple literal parser")
       case VariableUsage(varName) ⇒
-        matterType.syntax find { case (syntaxVar, _) ⇒ syntaxVar == varName } match {
-          case Some((_, syntaxAST)) ⇒ generateParser(codeHandler, syntaxAST)
-          case None                 ⇒ println(s"ParserGenerator:generateParser! Variable is nowhere defined: $varName")
+        matterType.syntax.body collectFirst { case x @ Assign(Variable(syntaxVar, _), _) if syntaxVar == varName ⇒ x } match {
+          case Some(Assign(_, syntaxAST)) ⇒ generateParser(codeHandler, syntaxAST)
+          case None                       ⇒ println(s"ParserGenerator:generateParser! Variable is nowhere defined: $varName")
         }
-      case id: TypeName ⇒
-        this.matterType.find(id) match {
+      case name: TypeName ⇒
+        this.matterType.find(name) match {
           case Some(matterType: MatterType) ⇒
             val matterTypeClass = Generator.generate(matterType)
 
@@ -129,7 +129,7 @@ class ParserGenerator(
   // @param parserName Should be the capitalized name of the generated parser
   def generateParserBuilder(parserName: String, op: AST): Unit = {
     println(s"ParserGenerator:generateParserBuilder($parserName)")
-    val parserClass = pkg.addClass(matterType.id + "$" + s"${parserName}Builder", None)
+    val parserClass = pkg.addClass(matterType.name + "$" + s"${parserName}Builder", None)
     parserClass.addInterface("de/hyronx/matter/library/ParserBuilder")
     parserClass.addDefaultConstructor
 
@@ -150,8 +150,8 @@ class ParserGenerator(
 
     val staticInitCH = classFile.addStaticBlock.codeHandler
 
-    val mainParser = matterType.syntax.map {
-      case (syntaxVar, op) ⇒
+    val mainParser = matterType.syntax.body.map {
+      case Assign(Variable(syntaxVar, _), op) ⇒
         val parserVar = syntaxVar + "Parser"
         classFile.addField(PARSER_TYPE, parserVar)
           .setFlags(parserFlags)

@@ -5,15 +5,15 @@ import cafebabe.ByteCodes._
 import cafebabe.AbstractByteCodes._
 
 import de.hyronx.matter.compiler.Helpers._
-import de.hyronx.matter.compiler.ast.MatterType
+import de.hyronx.matter.compiler.ast.{ MatterType, VariableLike }
 import de.hyronx.matter.compiler.types.Type
 
 class ClassGenerator(matterType: MatterType)(implicit pkg: PackageManager) {
   /*private val ancestor = matterType.ancestor match {
     case MatterBuiltIn ⇒ None
-    case _             ⇒ Some(matterType.ancestor.id)
+    case _             ⇒ Some(matterType.ancestor.name)
   }*/
-  private val classFile = pkg.addClass(matterType.id, None)
+  private val classFile = pkg.addClass(matterType.name, None)
 
   private def generateGetterMethod(fieldName: String, fieldType: String) = {
     val fieldGetter = "get" + fieldName.capitalize
@@ -108,7 +108,7 @@ class ClassGenerator(matterType: MatterType)(implicit pkg: PackageManager) {
     val codeHandler = classFile.addMethod(STRING_TYPE, "toString").codeHandler
     codeHandler <<
       DefaultNew(SB_CLASS) <<
-      Ldc(matterType.id) <<
+      Ldc(matterType.name) <<
       InvokeVirtual(SB_CLASS, "append", s"($STRING_TYPE)$SB_TYPE") <<
       Ldc('[') <<
       InvokeVirtual(SB_CLASS, "append", s"(C)$SB_TYPE")
@@ -140,8 +140,9 @@ class ClassGenerator(matterType: MatterType)(implicit pkg: PackageManager) {
   }
 
   def generate: ClassFile = {
-    val props: List[(String, String)] = matterType.mappings.map { mapping ⇒
-      (mapping.mappedVar, generateProperty(mapping.mappedVar, mapping.varType))
+    val props: List[(String, String)] = matterType.mapping.body.collect {
+      case variable: VariableLike ⇒
+        (variable.name, generateProperty(variable.name, variable.varType))
     }.toList
 
     println(s"ClassGenerator:generate! ClassFile: ${classFile.className}")

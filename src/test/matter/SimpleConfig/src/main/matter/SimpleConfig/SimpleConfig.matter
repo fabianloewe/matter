@@ -1,44 +1,57 @@
 Variable < Matter:
   Syntax:
-    name = "a".."z" { "a".."z" | "0".."9" | "-" | "_" }*
-  Mapping:
-    name -> String
+    var = "a".."z" ("a".."z" | "0".."9" | "-" | "_")*
+  Mapping(var):
+    /// value is implicitly called if no variable is accessed
+    /// e.g.:
+    // tuple Tuple = 0.1, "hi"
+    // tuple.1
+    /// is the same as:
+    // tuple.1.value
+    /// Both returning "hi"
+    value = var -> String
 
-Literal < Matter:
+Literal[T] < Matter:
   Syntax:
     data Grammar
+  Mapping(data):
+    // -> means "map" or "map to"
+    // param 1: TypeT | matching-function -> T
+    value = data -> T
 
-Assignment < Matter:
+Literal[Float]:
   Syntax:
-    assignment Grammar
+    numbers = ("0".."9")*
+    data = numbers ("." numbers)?
 
-StringLiteral < Literal:
+Literal[String]:
   Syntax:
-    data = "'" { "a".."z" | "A".."Z" | "0".."9" }* "'"
-  Mapping:
-    data -> String
+    data = "'" ("a".."z" | "A".."Z" | "0".."9")* "'"
 
-StringAssignment < Assignment:
-  Syntax:
-    assignment = Variable " = " StringLiteral
-  Mapping:
-    assignment -> variable String:
-      assignment.0.name
-    assignment -> literal String:
-      assignment.2.data
+String < Matter:
+  //Mapping(...any):
+    // >< means "fold"
+    // param 1: element-to-start-with
+    // param 2: left-element, right-element -> T
+    //value = any >< any.0, (left, right):
+      //left right
 
-NumberLiteral < Literal:
+Assignment[T] < Matter:
   Syntax:
-    numbers = { "0".."9" }*
-    data = numbers [ "." numbers ]
-  Mapping:
-    data -> Float
+    symbol = "="
+    assign = Variable " " symbol " " Literal[T]
+  Mapping(assign):
+    // Fully declared Tuple access:
+    // variable = assign -> (x Tuple[Variable, String, String, String, Literal]): x.0
+    // Tuple destructuring:
+    // variable = assign -> (x, _, _, _, _): x
+    // Tuple destructuring with default variable name:
+    // variable = assign -> $0
+    // Tuple access without destructuring but default first function parameter "_"
+    // (only usable if function just has one parameter):
+    variable = assign -> _.0
+    literal = assign -> _.4
 
-NumberAssignment < Assignment:
+Main < Matter:
   Syntax:
-    assignment = Variable " = " NumberLiteral
-  Mapping:
-    assignment -> variable String:
-      assignment.0.name
-    assignment -> literal Float:
-      assignment.2.data
+    main = Assignment[String] | Assignment[Float]

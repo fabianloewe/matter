@@ -35,9 +35,9 @@ object Helpers {
     val toJavaClass = {
       def constructHierarchy(mType: MatterTypeTree): List[String] = {
         if (mType == BaseBuiltIn)
-          List(BaseBuiltIn.id)
+          List(BaseBuiltIn.name)
         else
-          mType.id :: constructHierarchy(mType.parent)
+          mType.name :: constructHierarchy(mType.parent)
       }
 
       constructHierarchy(matterType).reverse.mkString("/")
@@ -46,28 +46,24 @@ object Helpers {
     val toJavaType = s"L$toJavaClass;"
   }
 
-  implicit class ASTConverter(ast: AST) {
+  implicit class SyntaxASTConverter(ast: AST) {
     import de.hyronx.matter.compiler.ast._
 
-    def getType(syntaxVars: AST.SyntaxMap): Type = {
+    def getType(syntaxVars: Seq[VariableLike]): Type = {
       def matchSyntax(ast: AST) = ast match {
-        case Option(internalDefs)    ⇒ OptionalType(internalDefs.getType(syntaxVars))
-        case Repeat(internalDefs)    ⇒ ListType(internalDefs.getType(syntaxVars))
-        case RepeatOne(internalDefs) ⇒ ListType(internalDefs.getType(syntaxVars))
-        case Literal(string)         ⇒ StringType
-        case Range(from, to)         ⇒ StringType
-        case Concatenation(defs)     ⇒ TupleType(matchTupleTypes(defs))
-        case Selection(defs)         ⇒ matchSelection(defs)
-        case Declaration(syntaxType) ⇒ syntaxType match {
-          case SyntaxType.String  ⇒ StringType
-          case SyntaxType.Grammar ⇒ TupleType
-        }
-        case VariableUsage(varName) ⇒ syntaxVars get varName match {
-          case Some(defs) ⇒ defs.getType(syntaxVars)
+        case Option(internalDefs)    ⇒ ParserType(GrammarType, OptionalType(internalDefs.getType(syntaxVars)))
+        case Repeat(internalDefs)    ⇒ ParserType(GrammarType, ListType(internalDefs.getType(syntaxVars)))
+        case RepeatOne(internalDefs) ⇒ ParserType(GrammarType, ListType(internalDefs.getType(syntaxVars)))
+        case Literal(string)         ⇒ ParserType(StringType, StringType)
+        case Range(from, to)         ⇒ ParserType(GrammarType, StringType)
+        case Concatenation(defs)     ⇒ ParserType(GrammarType, TupleType(matchTupleTypes(defs)))
+        case Selection(defs)         ⇒ ParserType(GrammarType, matchSelection(defs))
+        case VariableUsage(varName) ⇒ syntaxVars find (_.name == varName) match {
+          case Some(defs) ⇒ ParserType(GrammarType, defs.getType(syntaxVars))
           case None       ⇒ throw new ParserError(s"No such variable: $varName")
         }
-        case matterType: MatterType ⇒ StructType(matterType)
-        case typeName: TypeName     ⇒ Type(typeName) getOrElse UnknownType
+        case matterType: MatterType ⇒ ParserType(GrammarType, StructType(matterType))
+        case typeName: TypeName     ⇒ Type(typeName) map (ParserType(GrammarType, _)) getOrElse UnknownType(typeName)
         case other ⇒
           println(s"MappingParser:matchSyntax! Other: $other")
           VoidType

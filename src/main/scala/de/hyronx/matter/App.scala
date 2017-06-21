@@ -9,30 +9,30 @@ import de.hyronx.matter.management._
 import de.hyronx.matter.compiler._
 
 object App extends scala.App {
-  def printMatterTypes(matterType: ast.MatterTypeTree, indent: Int = 0): Unit = {
-    println(" " * indent + s"${matterType.id}:")
-    println(" " * indent + s"  HashCode: ${matterType.hashCode}")
-    println(" " * indent + s"  Ancestor: ${matterType.ancestor.id}")
-    println(" " * indent + s"  Descendants: ${matterType.descendants.map(_.id)}")
-    println(" " * indent + s"  Parent: ${matterType.parent.id}")
-    println(" " * indent + s"  Children: ${matterType.children.map(_.id)}")
-
-    if (matterType.isInstanceOf[ast.MatterType]) {
-      val matter = matterType.asInstanceOf[ast.MatterType]
-      println(" " * indent + s"  Syntax: ${matter.syntax}")
-      println(" " * indent + s"  Mapping: ${matter.mappings}")
-      println(" " * indent + s"  Is abstract: ${matter.isAbstract}")
-    }
-
-    matterType.children foreach { child ⇒
-      printMatterTypes(child, indent + 2)
-    }
-  }
-
-  def compileSources(tool: BuildTool, projectPath: Path, srcs: Seq[File] = Seq()) = {
+  def compileSources(
+    tool: BuildTool,
+    projectPath: Path = Paths.get("."),
+    srcs: Seq[File] = Seq()
+  ) = {
     import sys.process._
+
     tool match {
       case BuildTool.Sbt ⇒ Seq("/bin/sh", "-c", s"cd ${projectPath.normalize().toAbsolutePath()}; sbt compile").!
+      case BuildTool.Matter ⇒ srcs foreach { file ⇒
+        try {
+          Parser(Source.fromFile(file).mkString) fold (
+            { case ParserError(msg) ⇒ println(s"Parser failed: $msg") },
+            { result ⇒
+              print(result)
+              Validator(result)
+              //Generator(result)
+            }
+          )
+        } catch {
+          case e: java.io.FileNotFoundException ⇒ println(e.getMessage)
+          case e: CompilationError              ⇒ println(e.getMessage)
+        }
+      }
     }
   }
 
@@ -155,46 +155,31 @@ object App extends scala.App {
         // This config gets passed down to e.g. ParserGenerator
         implicit val config = cfg
 
-        // Open the project
-        val projectDir = config.outDir.toPath
-        Project.open(projectDir.normalize().toAbsolutePath()) fold (
-          { error ⇒ ErrorHandler(error, "Project configuration", Some("config.yaml")) },
-          { project ⇒
-            // Create the build directory in project directory
-            projectDir.resolve(config.buildDir.toPath).toFile.mkdirs
+        if (config.files.isEmpty) {
+          // Open the project
+          val projectDir = config.outDir.toPath
+          Project.open(projectDir.normalize().toAbsolutePath()) fold (
+            { error ⇒ ErrorHandler(error, "Project configuration", Some("config.yaml")) },
+            { project ⇒
+              // Create the build directory in project directory
+              projectDir.resolve(config.buildDir.toPath).toFile.mkdirs
 
-            // Get source files to compile
-            val sources = {
-              if (config.files.isEmpty)
-                project.sources
-              else
-                project.sources + (Language.Matter → config.files)
-            }
+              // Get source files to compile
+              val sources = project.sources
+              if (sources.isEmpty)
+                ErrorHandler("No sources specified", "Command execution")
 
-            if (sources.isEmpty)
-              ErrorHandler("No sources specified", "Command execution")
-
-            // Compile supported source files
-            sources foreach {
-              case (Language.Scala, _) ⇒ compileSources(BuildTool.Sbt, projectDir)
-              case (Language.Java, _)  ⇒ compileSources(BuildTool.Sbt, projectDir)
-              case (Language.Matter, files) ⇒ files foreach { file ⇒
-                try {
-                  Parser(Source.fromFile(file).mkString) fold (
-                    { case ParserError(msg) ⇒ println(s"Parser failed: $msg") },
-                    { result ⇒
-                      printMatterTypes(result)
-                      Generator(result)
-                    }
-                  )
-                } catch {
-                  case e: java.io.FileNotFoundException ⇒ println(e.getMessage)
-                  case e: CompilationError              ⇒ println(e.getMessage)
-                }
+              // Compile supported source files
+              sources foreach {
+                case (Language.Scala, _)      ⇒ compileSources(BuildTool.Sbt, projectDir)
+                case (Language.Java, _)       ⇒ compileSources(BuildTool.Sbt, projectDir)
+                case (Language.Matter, files) ⇒ compileSources(BuildTool.Matter, srcs = sources(Language.Matter))
               }
             }
-          }
-        )
+          )
+        } else {
+          compileSources(BuildTool.Matter, srcs = config.files)
+        }
       case RunOp ⇒
         import sys.process._
 

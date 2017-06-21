@@ -22,7 +22,7 @@ class MappingGenerator(
       Comment(s"Tuple calls member ($name)") <<
       Ldc(name.toInt) <<
       InvokeInterface("scala/collection/Seq", "apply", s"(I)$OBJECT_TYPE")
-    case (TupleType(wrappedTypes), CallExpression(nextCaller, nextCallee)) ⇒ nextCaller match {
+    case (TupleType(wrappedTypes), Call(nextCaller, nextCallee)) ⇒ nextCaller match {
       case Variable(nextName, nextType) ⇒
         codeHandler <<
           Comment(s"Tuple calls member (${nextCaller.name} ${nextCaller.varType}) which calls something (${nextCallee.name} ${nextCallee.varType})") <<
@@ -31,9 +31,9 @@ class MappingGenerator(
         generateTypeSpecificCall(nextType, nextCallee, codeHandler)
     }
     case (StructType(thatMatterType), Variable(name, varType)) ⇒
-      if (thatMatterType.mappings exists (_.mappedVar == name)) {
+      if (thatMatterType.children exists (_.name == name)) {
         codeHandler <<
-          Comment(s"Struct (${thatMatterType.id}) calls member ($name $varType)") <<
+          Comment(s"Struct (${thatMatterType.name}) calls member ($name $varType)") <<
           // WARN: Possible error because of GetField twice with generateCall()
           CheckCast(thatMatterType.toJavaClass) <<
           GetField(thatMatterType.toJavaClass, name, callee.varType.toJavaType)
@@ -54,6 +54,7 @@ class MappingGenerator(
       generateTypeSpecificCall(varType, callee, codeHandler)
   }
 
+  /*
   private def generateStringMapping(
     mappedVar: String,
     syntaxAST: AST,
@@ -63,11 +64,14 @@ class MappingGenerator(
       case Enclosing(defs)          ⇒ isConvertible(defs)
       case EnclosingMultiple(defs)  ⇒ defs map (isConvertible(_)) forall (_ == true)
       case Literal(_) | Range(_, _) ⇒ true
-
-      case VariableUsage(varName) ⇒ matterType.syntax find { case (syntaxVar, _) ⇒ syntaxVar == varName } match {
-        case Some((_, defs)) ⇒ isConvertible(defs)
-        case None            ⇒ println(s"ParserGenerator:isConvertibleToString! Variable is nowhere defined: $varName"); false
-      }
+      case VariableUsage(varName) ⇒
+        val result = for {
+          variable ← matterType.syntax.body collectFirst {
+            case syntaxVar @ SyntaxVariable(name, _, _) if name == varName ⇒ syntaxVar
+          }
+          definition ← variable.definition
+        } yield isConvertible(definition)
+        result getOrElse false
       case _: TypeName ⇒ false
     }
 
@@ -99,10 +103,15 @@ class MappingGenerator(
           string matches "[0-9]+"
         }
       case Range(from, to) ⇒ (from matches "[0-9]+") && (to matches "[0-9]+")
-      case VariableUsage(varName) ⇒ matterType.syntax find { case (syntaxVar, _) ⇒ syntaxVar == varName } match {
-        case Some((_, defs)) ⇒ isConvertible(defs)
-        case None            ⇒ println(s"ParserGenerator:isConvertibleToFloat! Variable is nowhere defined: $varName"); false
-      }
+      case VariableUsage(varName) ⇒
+        val result = for {
+          variable ← matterType.syntax.body collectFirst {
+            case syntaxVar @ SyntaxVariable(name, _, _) if name == varName ⇒ syntaxVar
+          }
+          definition ← variable.definition
+        } yield isConvertible(definition)
+
+        result getOrElse false
       case _: TypeName ⇒ false
     }
 
@@ -116,6 +125,7 @@ class MappingGenerator(
       throw new GeneratorError("Variable cannot automatically be mapped to Float")
     }
   }
+  */
 
   private def generate(): Unit = {
     val mapCH = pbClass.addMethod(OBJECT_TYPE, "map", OBJECT_TYPE).codeHandler
@@ -124,25 +134,25 @@ class MappingGenerator(
       New(matterType.toJavaClass) <<
       DUP
 
-    matterType.mappings map {
-      case MappingExpression(syntaxVar, mappedVar, _, op) ⇒
-        // Match the AST and check if the syntax variable exists in one "match"
-        (op, matterType.syntax find { case (varName, _) ⇒ syntaxVar == varName }) match {
+    matterType.mapping.body collect {
+      /*
+      case Assign(Variable(mappedVar, _), VariableLike(syntaxVar, _)) ⇒
+        // Match the AST and check if the syntaxBody variable exists in one "match"
+        (op, matterType.syntax.body find { case variable: VariableLike ⇒ syntaxVar == variable.name }) match {
           // CONSIDER: if varType == *Type*
-          case (StringMapping, Some((_, ast))) ⇒ generateStringMapping(mappedVar, ast, mapCH)
-          case (FloatMapping, Some((_, ast)))  ⇒ generateFloatMapping(mappedVar, ast, mapCH)
-          case _                               ⇒ throw new GeneratorError(s"Variable not found: $syntaxVar")
+          case (StringMapping, Some(Assign(_, ast))) ⇒ generateStringMapping(mappedVar, ast, mapCH)
+          case (FloatMapping, Some(Assign(_, ast)))  ⇒ generateFloatMapping(mappedVar, ast, mapCH)
+          case _                                     ⇒ throw new GeneratorError(s"Variable not found: $syntaxVar")
         }
-      case MappingStatement(syntaxVar, mappedVar, _, ops) ⇒ ops foreach { op ⇒
-        op match {
-          case CallExpression(caller, callee) ⇒
-            generateCall(caller, callee, mapCH)
-          case _ ⇒ throw new GeneratorError(s"Not implemented yet: $op")
-        }
+        */
+      case Assign(Variable(mappedVar, _), op) ⇒ op match {
+        case Call(caller, callee) ⇒
+          generateCall(caller, callee, mapCH)
+        case _ ⇒ throw new GeneratorError(s"Not implemented yet: $op")
       }
     }
 
-    val matterTypeMembers = matterType.mappings.map(_.varType.toJavaType).toList
+    val matterTypeMembers = matterType.mapping.body.map(_.varType.toJavaType).toList
     mapCH <<
       InvokeSpecial(matterType.toJavaClass, "<init>", s"(${matterTypeMembers.mkString})V") <<
       ARETURN
