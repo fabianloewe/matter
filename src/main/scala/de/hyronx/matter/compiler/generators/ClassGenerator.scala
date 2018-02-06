@@ -4,16 +4,15 @@ import cafebabe._
 import cafebabe.ByteCodes._
 import cafebabe.AbstractByteCodes._
 
-import de.hyronx.matter.compiler.Helpers._
-import de.hyronx.matter.compiler.ast.MatterType
-import de.hyronx.matter.compiler.types.Type
+import de.hyronx.matter.Config
+import de.hyronx.matter.compiler.types.{TypeTrait, UserTypeTrait, VariableLike}
 
-class ClassGenerator(matterType: MatterType)(implicit pkg: PackageManager) {
-  /*private val ancestor = matterType.ancestor match {
+class ClassGenerator(typ: UserTypeTrait)(implicit config: Config, pkg: PackageManager) {
+  /*private val ancestor = typ.ancestor match {
     case MatterBuiltIn ⇒ None
-    case _             ⇒ Some(matterType.ancestor.id)
+    case _             ⇒ Some(typ.ancestor.name)
   }*/
-  private val classFile = pkg.addClass(matterType.id, None)
+  private val classFile = pkg.addClass(typ.name, None)
 
   private def generateGetterMethod(fieldName: String, fieldType: String) = {
     val fieldGetter = "get" + fieldName.capitalize
@@ -52,7 +51,7 @@ class ClassGenerator(matterType: MatterType)(implicit pkg: PackageManager) {
   }
 
   // Returns the Java field type
-  def generateGetter(propName: String, propType: Type) = {
+  def generateGetter(propName: String, propType: TypeTrait) = {
     val fieldName = propName
     val fieldType = propType.toJavaType
     classFile.addField(fieldType, fieldName)
@@ -61,7 +60,7 @@ class ClassGenerator(matterType: MatterType)(implicit pkg: PackageManager) {
   }
 
   // Returns the Java field type
-  def generateSetter(propName: String, propType: Type) = {
+  def generateSetter(propName: String, propType: TypeTrait) = {
     val fieldName = propName
     val fieldType = propType.toJavaType
     classFile.addField(fieldType, fieldName)
@@ -70,7 +69,7 @@ class ClassGenerator(matterType: MatterType)(implicit pkg: PackageManager) {
   }
 
   // Returns the Java field type
-  def generateProperty(propName: String, propType: Type) = {
+  def generateProperty(propName: String, propType: TypeTrait) = {
     val fieldName = propName
     val fieldType = propType.toJavaType
     classFile.addField(fieldType, fieldName)
@@ -102,49 +101,60 @@ class ClassGenerator(matterType: MatterType)(implicit pkg: PackageManager) {
     constructor.freeze
   }
 
-  def generateToString(properties: List[(String, String)]) = {
+  def generateToString(properties: List[(String, String)]): Unit = {
     val SB_CLASS = "java/lang/StringBuilder"
     val SB_TYPE = s"L$SB_CLASS;"
+
     val codeHandler = classFile.addMethod(STRING_TYPE, "toString").codeHandler
     codeHandler <<
       DefaultNew(SB_CLASS) <<
-      Ldc(matterType.id) <<
-      InvokeVirtual(SB_CLASS, "append", s"($STRING_TYPE)$SB_TYPE") <<
-      Ldc('[') <<
-      InvokeVirtual(SB_CLASS, "append", s"(C)$SB_TYPE")
+      Ldc(typ.name) <<
+      InvokeVirtual(SB_CLASS, "append", s"($STRING_TYPE)$SB_TYPE")
 
-    properties.dropRight(1) foreach {
-      case (name, javaType) ⇒ codeHandler <<
-        Ldc(s"$name=") <<
+    if (properties.nonEmpty) {
+      codeHandler <<
+        Ldc('[') <<
+        InvokeVirtual(SB_CLASS, "append", s"(C)$SB_TYPE")
+
+      properties.dropRight(1) foreach {
+        case (name, javaType) ⇒ codeHandler <<
+          Ldc(s"$name=") <<
+          InvokeVirtual(SB_CLASS, "append", s"($STRING_TYPE)$SB_TYPE") <<
+          ArgLoad(0) <<
+          InvokeVirtual(typ.toJavaClass, s"get${name.capitalize}", s"()$javaType") <<
+          //InvokeVirtual(SB_CLASS, "append", s"($javaType)$SB_TYPE") <<
+          InvokeVirtual(SB_CLASS, "append", s"($OBJECT_TYPE)$SB_TYPE") <<
+          Ldc(", ") <<
+          InvokeVirtual(SB_CLASS, "append", s"($STRING_TYPE)$SB_TYPE")
+      }
+
+      val (lastVar, lastVarType) = properties.last
+      codeHandler <<
+        Ldc(s"$lastVar=") <<
         InvokeVirtual(SB_CLASS, "append", s"($STRING_TYPE)$SB_TYPE") <<
         ArgLoad(0) <<
-        InvokeVirtual(matterType.toJavaClass, s"get${name.capitalize}", s"()$javaType") <<
-        InvokeVirtual(SB_CLASS, "append", s"($javaType)$SB_TYPE") <<
-        Ldc(", ") <<
-        InvokeVirtual(SB_CLASS, "append", s"($STRING_TYPE)$SB_TYPE")
+        InvokeVirtual(typ.toJavaClass, s"get${lastVar.capitalize}", s"()$lastVarType") <<
+        //InvokeVirtual(SB_CLASS, "append", s"($lastVarType)$SB_TYPE") <<
+        InvokeVirtual(SB_CLASS, "append", s"($OBJECT_TYPE)$SB_TYPE") <<
+        Ldc(']') <<
+        InvokeVirtual(SB_CLASS, "append", s"(C)$SB_TYPE")
     }
-
-    val (lastVar, lastVarType) = properties.last
     codeHandler <<
-      Ldc(s"$lastVar=") <<
-      InvokeVirtual(SB_CLASS, "append", s"($STRING_TYPE)$SB_TYPE") <<
-      ArgLoad(0) <<
-      InvokeVirtual(matterType.toJavaClass, s"get${lastVar.capitalize}", s"()$lastVarType") <<
-      InvokeVirtual(SB_CLASS, "append", s"($lastVarType)$SB_TYPE") <<
-      Ldc(']') <<
-      InvokeVirtual(SB_CLASS, "append", s"(C)$SB_TYPE") <<
       InvokeVirtual(SB_CLASS, "toString", s"()$STRING_TYPE") <<
       ARETURN
     codeHandler.freeze
-
   }
 
   def generate: ClassFile = {
-    val props: List[(String, String)] = matterType.mappings.map { mapping ⇒
-      (mapping.mappedVar, generateProperty(mapping.mappedVar, mapping.varType))
-    }.toList
-
     println(s"ClassGenerator:generate! ClassFile: ${classFile.className}")
+    classFile.addInterface(INTERFACE_CLASS)
+
+    ParserGenerator(typ, classFile)
+    MappingGenerator(typ, classFile)
+
+    val props: List[(String, String)] = typ.variables.map {
+      case VariableLike(varName, varType) ⇒ varName → generateProperty(varName, varType)
+    }.toList
     println(s"ClassGenerator:generate! Props: $props")
 
     generateConstructor(props)
@@ -154,6 +164,6 @@ class ClassGenerator(matterType: MatterType)(implicit pkg: PackageManager) {
 }
 
 object ClassGenerator {
-  def apply(matterType: MatterType)(implicit pkg: PackageManager) =
-    new ClassGenerator(matterType).generate
+  def apply(typ: UserTypeTrait)(implicit config: Config, pkg: PackageManager) =
+    new ClassGenerator(typ).generate
 }

@@ -12,10 +12,10 @@ case class MatterInfo(
 }
 
 case class ProjectInfo(
-    @BeanProperty var name: String,
-    @BeanProperty var vendor: String,
-    @BeanProperty var version: String,
-    @BeanProperty var `type`: String = "App"
+                        @BeanProperty var name: String,
+                        @BeanProperty var vendor: String,
+                        @BeanProperty var version: String,
+                        @BeanProperty var `type`: String = "Application"
 ) {
   // Needed by SnakeYAML for reading YAML...
   def this() = this(null, null, null, null)

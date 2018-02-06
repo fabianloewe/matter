@@ -2,12 +2,15 @@ package de.hyronx.matter.library
 
 import fastparse.all._
 
-trait ParserBuilder {
-  def apply: P[_]
-  def map(a: Any): Any
+trait MatterBased {
+  def getParser(): P[_]
 }
 
 object FastparseWrapper {
+  private var debug = false
+
+  def setDebug(b: Boolean): Unit = debug = b
+
   private def flattenToList(t: Product): List[_] = {
     val r = t.productIterator.toList.map { x: Any ⇒
       x match {
@@ -22,7 +25,7 @@ object FastparseWrapper {
         case _              ⇒ left :+ right
       }
     }
-    println(s"FastparseWrapper:flattenToList! Result: $s")
+    if (debug) System.out.println(s"FastparseWrapper:flattenToList! Result: $s")
     s
   }
 
@@ -31,7 +34,7 @@ object FastparseWrapper {
   ): P[_] = {
     var parser: P[_] = ps.head
     ps.tail.foreach { p ⇒ parser = parser ~ p }
-    println(s"FastparseWrapper:concat! Parser: $parser")
+    if (debug) System.out.println(s"FastparseWrapper:concat! Parser: $parser")
     parser map { case tup: Product ⇒ flattenToList(tup) }
   }
 
@@ -50,7 +53,7 @@ object FastparseWrapper {
     max: Int = 0,
     exactly: Int = -1
   ) = {
-    println(s"FastparseWrapper:rep($min, $max)")
+    if (debug) System.out.println(s"FastparseWrapper:rep($min, $max)")
     if (sep == null) {
       p.rep(min, Pass, max, exactly)
     } else {
@@ -61,7 +64,7 @@ object FastparseWrapper {
   def opt(p: P[_]) = p.?
 
   def range(from: String, to: String) = {
-    println(s"FastparseWrapper:range($from, $to)")
+    if (debug) System.out.println(s"FastparseWrapper:range($from, $to)")
     if (from.length == 1 && to.length == 1)
       P(CharIn(from.head to to.head).!)
     else
@@ -69,40 +72,67 @@ object FastparseWrapper {
   }
 
   def literal(lit: String) = {
-    println(s"FastparseWrapper:literal($lit)")
+    if (debug) System.out.println(s"FastparseWrapper:literal($lit)")
     P(lit).!
   }
 
+  /*
   def buildParser(pb: ParserBuilder) = {
+
     val parser = P(pb.apply map { x ⇒
       println(s"FastparseWrapper:buildParser! Map variable: $x")
       pb.map(x)
     })
+
+    //val parser = pb.apply
+    println(s"FastparseWrapper:buildParser! Parser: $parser")
     parser
   }
 
-  def mkString(obj: Any): String = obj match {
-    case Some(seq: Seq[_]) ⇒ seq.map(mkString(_)).mkString
-    case Some(value)       ⇒ value.toString
-    case seq: Seq[_]       ⇒ seq.map(mkString(_)).mkString
-    case _                 ⇒ obj.toString
-
-  }
-
-  def mkString(product: Product): String = product.productIterator.map { elem ⇒
-    elem match {
-      case Some(seq: Seq[_])   ⇒ seq.mkString
-      case Some(prod: Product) ⇒ mkString(prod)
-      case Some(value)         ⇒ value.toString
-      case prod: Product       ⇒ mkString(prod)
-      case seq: Seq[_]         ⇒ seq.mkString
-      case _                   ⇒ elem.toString
+  def mkString(obj: Any): String = {
+    val result = obj match {
+      case Some(seq: Seq[_]) ⇒ seq.map(mkString(_)).mkString
+      case Some(value)       ⇒ value.toString
+      case seq: Seq[_]       ⇒ seq.map(mkString(_)).mkString
+      case _                 ⇒ obj.toString
     }
-  }.toList.mkString
+
+    println(s"FastparseWrapper:mkString($obj)! Result: $result")
+    result
+  }
+  *
+  */
+
+  def mkString(obj: Any): String = {
+    val result = obj match {
+      case product: Product ⇒
+        product.productIterator.toList.map { elem ⇒
+          elem match {
+            case Some(seq: Seq[_]) ⇒ seq.mkString
+            case Some(prod: Product) ⇒ mkString(prod)
+            case Some(value) ⇒ value.toString
+            case prod: Product ⇒ mkString(prod)
+            case seq: Seq[_] ⇒ seq.mkString
+            case _ ⇒ elem.toString
+          }
+        }.mkString
+      case seq: Seq[_] ⇒ seq.map(mkString(_)).mkString
+      case _ ⇒ obj.toString
+    }
+    if (debug) System.out.println(s"FastparseWrapper:mkString($obj)! Result: $result")
+    result
+  }
 
   def toFloat(p: P[_]): P[Float] = p.! map { x ⇒
     java.lang.Float.valueOf(x).floatValue
   }
 
-  def map(p: P[_], f: Any ⇒ P[_]) = p map f
+  def map(p: P[_], f: Any ⇒ P[_]) = {
+    if (debug) System.out.println(s"FastparseWrapper:map($p, $f)")
+    p map f
+  }
+
+  def println(obj: Any) = System.out.println(obj.toString)
+
+  def log(p: P[_]) = p.log()
 }

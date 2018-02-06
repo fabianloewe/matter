@@ -21,5 +21,7 @@ projectFilesBackup/
 .classpath
 .ensime
 .ensime_cache/
+ensime.sbt
 version.properties
 RUNNING_PID
+/bin/

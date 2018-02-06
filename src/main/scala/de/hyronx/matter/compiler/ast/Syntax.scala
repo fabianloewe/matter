@@ -1,39 +1,33 @@
 package de.hyronx.matter.compiler.ast
 
-trait SyntaxType {
-  def name: String
-}
-object SyntaxType {
-  case object String extends SyntaxType {
-    val name = "String"
-  }
-  case object Grammar extends SyntaxType {
-    val name = "Grammar"
-  }
-}
+import de.hyronx.matter.compiler.types.TypePath
 
-sealed trait SyntaxAST extends AST
-case class Declaration(varType: SyntaxType) extends SyntaxAST
-case class VariableUsage(name: String) extends SyntaxAST
-case class Range(from: String, to: String) extends SyntaxAST
+//sealed trait SyntaxAST extends AST
 
-sealed trait EnclosingMultiple extends SyntaxAST {
-  def definitions: AST.Definitions
-}
-object EnclosingMultiple {
-  def unapply(encl: EnclosingMultiple) = Some(encl.definitions)
-}
+case class Declaration(typeName: TypePath) extends AST
 
-case class Concatenation(definitions: AST.Definitions) extends EnclosingMultiple
-case class Selection(definitions: AST.Definitions) extends EnclosingMultiple
+case class VariableUsage(name: String) extends AST
 
-sealed trait Enclosing extends SyntaxAST {
+case class TypeConstruction(name: TypePath, genericTypes: Seq[TypePath] = Seq(), params: Seq[Variable] = Seq()) extends AST
+
+case class Range(from: String, to: String) extends AST
+
+case class Concatenation() extends BodyAST
+
+case class Selection() extends BodyAST
+
+sealed trait Enclosing extends AST {
   def definition: AST
 }
+
 object Enclosing {
   def unapply(encl: Enclosing) = Some(encl.definition)
 }
+
 case class Repeat(definition: AST) extends Enclosing
+
 case class RepeatOne(definition: AST) extends Enclosing
+
 case class Option(definition: AST) extends Enclosing
+
 case class Group(definition: AST) extends Enclosing

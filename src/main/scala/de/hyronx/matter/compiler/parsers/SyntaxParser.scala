@@ -1,10 +1,10 @@
 package de.hyronx.matter.compiler.parsers
 
+import fastparse.all._
 import de.hyronx.matter.compiler.ast._
+import de.hyronx.matter.library.MutableTree
 
-class SyntaxParser(indent: Indentation) extends BaseParser {
-  import fastparse.all._
-
+class SyntaxParser(indent: Indentation) extends ExpressionsParser(indent) {
   val range: P[Range] = {
     val rangeLowerCase = P("\"" ~ lowercase.! ~ "\"..\"" ~ lowercase.! ~ "\"") map {
       case (from, to) ⇒ Range(from, to)
@@ -19,67 +19,55 @@ class SyntaxParser(indent: Indentation) extends BaseParser {
     P(rangeLowerCase | rangeUpperCase | rangeNumber)
   }
 
-  val end = P(ws | nl)
-  val literalAST = literal map (Literal)
-  val repeat = P("{" ~ ws ~ selection ~ ws ~ "}*") map {
-    case sel: Selection ⇒ Repeat(sel)
-    case defs           ⇒ Repeat(defs)
+  val group: P[AST] = P("(" ~ selection ~ ")" ~ ("*".! | "+".! | "?".!).?) map {
+    case (sel: Selection, Some("*")) ⇒ Repeat(sel)
+    case (defs, Some("*")) ⇒ Repeat(defs)
+    case (sel: Selection, Some("+")) ⇒ RepeatOne(sel)
+    case (defs, Some("+")) ⇒ RepeatOne(defs)
+    case (sel: Selection, Some("?")) ⇒ Option(sel)
+    case (defs, Some("?")) ⇒ Option(defs)
+    case (defs, None) ⇒ defs
   }
 
-  val repeatOne = P("{" ~ ws ~ selection ~ ws ~ "}+") map {
-    case sel: Selection ⇒ RepeatOne(sel)
-    case defs           ⇒ RepeatOne(defs)
+  val variableUsage: P[VariableUsage] = variableName map VariableUsage
+
+  val typeParser: P[TypeConstruction] = {
+    val genericParser = P("[" ~ expressionList(indent, scopedType) ~ "]")
+    val paramsParser = P("(" ~ expressionList(indent, variableName map (Variable(_))) ~ ")")
+
+    P(scopedType ~ genericParser.? ~ paramsParser.?) map {
+      case (typeName, generics, params) ⇒ TypeConstruction(
+        typeName,
+        generics.getOrElse(Seq()),
+        params.getOrElse(Seq())
+      )
+    }
   }
 
-  val option = P("[" ~ ws ~ selection ~ ws ~ "]") map {
-    case sel: Selection ⇒ Option(sel)
-    case defs           ⇒ Option(defs)
+  val definitions: P[AST] = P(group | range | literalAST | typeParser)
+
+  val concatenation: P[AST] /* Concatenation | AST */ = {
+    P(definitions | variableUsage).rep(min = 2, sep = ws) map { seq ⇒
+      if (seq.lengthCompare(1) > 0)
+        AST(Concatenation(), seq.toStream)
+      else
+        seq.head
+
+    }
   }
 
-  val group = P("(" ~ ws ~ selection ~ ws ~ ")")
-
-  val concatenation: P[AST] = {
-    P(repeat | repeatOne | option | group | range | scopedType |
-      variableName.map(VariableUsage) |
-      literalAST)
-      .rep(min = 1, sep = ws) map { seq ⇒
-        if (seq.size > 1)
-          Concatenation(seq)
-        else
-          seq(0)
-      }
+  val selection: P[AST] /* Selection | AST */ = {
+    P(concatenation | definitions).rep(min = 1, sep = P(ws ~ "|" ~ ws)) map { seq ⇒
+      if (seq.lengthCompare(1) > 0)
+        AST(Selection(), seq.toStream)
+      else
+        seq.head
+    }
   }
 
-  val selection: P[AST] = concatenation.rep(min = 1, sep = P(ws ~ "|" ~ ws)) map { seq ⇒
-    if (seq.size > 1)
-      Selection(seq)
-    else
-      seq(0)
-  }
-
-  val syntax: P[AST.SyntaxMap] = {
-    P(
-      // Check if there is a variable definition
-      (variableName ~ ws.rep(1) ~ "=" ~/ ws ~ selection) |
-        // Check if there is a variable declaration
-        variableDecl.map {
-          // It is so try to create a Tuple2 to later build a map from
-          case VariableDecl(varName, varType) ⇒ (
-            varName,
-            Declaration(varType.name match {
-              case "String"  ⇒ SyntaxType.String
-              case "Grammar" ⇒ SyntaxType.Grammar
-            })
-          )
-        }
-    ).rep(min = 1, sep = indent.same) map { result ⇒
-        println(s"` Content map: $result")
-        // TODO: Add check if all variables exist
-        collection.mutable.Map(result: _*)
-      }
-  }
+  val body: P[AST] = P(assignExpression(selection) | declareExpression)
 }
 
 object SyntaxParser {
-  def apply(indent: Indentation) = new SyntaxParser(indent).syntax
+  def apply(indent: Indentation): P[AST] = new SyntaxParser(indent).body
 }

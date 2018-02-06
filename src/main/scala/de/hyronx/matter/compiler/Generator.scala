@@ -1,35 +1,45 @@
 package de.hyronx.matter.compiler
 
-import cafebabe.PackageManager
+import cafebabe._
 import cafebabe.ByteCodes._
 import cafebabe.AbstractByteCodes._
-
 import de.hyronx.matter.Config
-import de.hyronx.matter.compiler.ast.{ MatterTypeTree, MatterType }
+import de.hyronx.matter.compiler.errors.GeneratorError
+import de.hyronx.matter.compiler.types._
 import de.hyronx.matter.compiler.generators._
 
 object Generator {
-  def generate(matterType: MatterType)(implicit config: Config, pkg: PackageManager) = {
-    println(s"Generator:generate! Searching for $matterType")
-    if (matterType.isAbstract)
-      throw new GeneratorError(s"Matter type ${matterType.id} is abstract and cannot be generated.")
+  def generate(typ: UserTypeTrait)(implicit config: Config, pkg: PackageManager): ClassFile = {
+    println(s"Generator:generate! Searching for $typ")
+    if (typ.isInstanceOf[AbstractTypeTrait])
+      throw new GeneratorError(s"Matter type $typ is abstract and cannot be generated.")
 
-    pkg.findClass(matterType.id) match {
+    pkg.findClass(typ.name) match {
       case Some(foundClass) ⇒
         println("Generator:generate! Found!")
         foundClass
       case None ⇒
         println("Generator:generate! Not found!!!")
-        ParserGenerator(matterType, ClassGenerator(matterType))
+        ClassGenerator(typ)
     }
   }
 
-  def apply(base: MatterTypeTree)(implicit config: Config) = {
+  def apply(base: BuiltInNode)(implicit config: Config) = {
+    import de.hyronx.matter.compiler.types._
+
     implicit val pkg = new PackageManager(config.packageName)
 
-    base.children
-      .collect { case child: MatterType if !child.isAbstract ⇒ child }
-      .foreach(generate(_))
+    //base.printTree(true)
+    base.foreach {
+      case child: Type ⇒
+        println(s"Generator:apply! Generating: $child")
+        generate(child)
+      case child: GenericUserTypeTrait ⇒
+        child.implementations foreach { genChild ⇒
+          generate(genChild)
+        }
+      case _ ⇒
+    }
 
     val mainClass = pkg.addClass("Compiler")
     mainClass.addDefaultConstructor
@@ -56,7 +66,7 @@ object Generator {
       InvokeStatic("java/nio/file/Files", "readAllBytes", "(Ljava/nio/file/Path;)[B") <<
       InvokeSpecial("java/lang/String", "<init>", "([B)V") <<
       AStore(stringVar) <<
-      InvokeStatic(s"${pkg.javaName}/NumberAssignment", "parse", "()Lfastparse/core/Parser;") <<
+      InvokeStatic(s"${pkg.javaName}/Main", "getParser", "()Lfastparse/core/Parser;") <<
       ALoad(stringVar) <<
       Ldc(0) <<
       ACONST_NULL <<

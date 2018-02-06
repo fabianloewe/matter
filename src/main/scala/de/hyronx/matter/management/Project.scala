@@ -32,15 +32,21 @@ class Project private (
 }
 
 object Project {
+
   sealed trait Type
+
   case object Application extends Type
+
   case object Library extends Type
+
   case object Backend extends Type
 
   sealed trait Error
+
   case class InvalidMatterVersion(thisVersion: String) extends Error {
     override val toString = s"The specified version is incompatible with version $thisVersion"
   }
+
   case object InvalidType extends Error {
     override val toString = s"The specified type is invalid. Please choose between $Application, $Library and $Backend"
   }
@@ -100,25 +106,27 @@ object Project {
     val fileWriter = new FileWriter(ignFile.toFile)
 
     // This files and dirs should not generally be published
-    fileWriter.write("""*.iml
-      |*.class
-      |*.log
-      |dist/
-      |boot/
-      |logs/
-      |lib/
-      |out/
-      |build/
-      |tmp/
-      |.history/
-      |.idea/
-      |.idea_modules/
-      |.DS_STORE
-      |.cache
-      |.settings
-      |.project
-      |.classpath
-    """.stripMargin)
+    fileWriter.write(
+      """*.iml
+        |*.class
+        |*.log
+        |dist/
+        |boot/
+        |logs/
+        |lib/
+        |out/
+        |build/
+        |tmp/
+        |.history/
+        |.idea/
+        |.idea_modules/
+        |.DS_STORE
+        |.cache
+        |.settings
+        |.project
+        |.classpath
+      """.stripMargin
+    )
     fileWriter.flush()
   }
 

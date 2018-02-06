@@ -1,49 +1,47 @@
 package de.hyronx.matter.compiler.types
 
-import scala.collection.mutable.ListBuffer
+import de.hyronx.matter.compiler.ast.AST
 
-import de.hyronx.matter.compiler.ast.{ TypeName, VariableLike, BaseBuiltIn, MatterType }
+trait UserTypeTrait extends TypeTrait {
+  var body: Seq[AST]
+  var variables: Set[VariableLike]
 
-case class Argument(
-  val name: String,
-  val index: Int,
-  val varType: Type
-) extends VariableLike
+  def hasSyntax(): Boolean = getSyntax().isDefined
 
-case class Method(
-    name: String,
-    args: List[Argument],
-    retType: Type
-) extends VariableLike {
-  val varType = retType
+  def getSyntax(): Option[UserTypeTrait] = findChild { child ⇒
+    child == "Syntax" && !child.isInstanceOf[AbstractTypeTrait]
+  } collectFirst { case child: UserTypeTrait ⇒ child }
+
+  def hasMapping(): Boolean = getMapping().isDefined
+
+  def getMapping(): Option[UserTypeTrait] = findChild { child ⇒
+    child == "Mapping" && !child.isInstanceOf[AbstractTypeTrait]
+  } collectFirst { case child: UserTypeTrait ⇒ child }
 }
 
-trait Type {
-  def name: String
-  def members: Seq[VariableLike]
-
-  def findMember(name: String) = members find (_.name == name)
+object UserTypeTrait {
+  def unapply(typeTrait: UserTypeTrait) = Some((
+    typeTrait.name,
+    typeTrait.ancestor,
+    typeTrait.variables,
+    typeTrait.body,
+    typeTrait.children,
+    typeTrait.parent
+  ))
 }
 
-object Type {
-  val types: ListBuffer[Type] = ListBuffer(
-    StringType,
-    OptionalType,
-    ListType,
-    UnionType,
-    TupleType,
-    IntType,
-    FloatType,
-    BoolType,
-    VoidType
-  )
+case class Type(
+                 name: String,
+                 ancestor: TypeTrait,
+                 var body: Seq[AST],
+                 var variables: Set[VariableLike] = Set()
+               ) extends UserTypeTrait
 
-  def apply(name: String) = types find (_.name == name)
-  def apply(name: TypeName) = types find (_.name == name.name) match {
-    case None ⇒ BaseBuiltIn find name match {
-      case Some(matterType: MatterType) ⇒ Some(StructType(matterType))
-      case _                            ⇒ None
-    }
-    case found ⇒ found
-  }
-}
+trait AbstractTypeTrait extends TypeTrait
+
+case class AbstractType(
+                         name: String,
+                         ancestor: TypeTrait,
+                         var body: Seq[AST] = Seq(),
+                         var variables: Set[VariableLike] = Set()
+                       ) extends AbstractTypeTrait with UserTypeTrait
