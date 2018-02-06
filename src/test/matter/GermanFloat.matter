@@ -1,0 +1,23 @@
+GermanFloat < Matter:
+  Syntax:
+    float-number = [ "-" ] { "0".."9" }+ "," { "0".."9" }+
+
+  Mapping:
+    .number Float =
+      sign = if float-number.0: 1 else: -1
+      in-fraction = false
+      fraction-part Float = 0
+      int-part Float = 0
+      fraction-divisor = 1
+
+      number = float-number.1 float-number.2 float-number.3
+      number.for-each => char:
+        if char >= "0" && char <= "9":
+          if in-fraction && char -> Int:
+            fraction-part = fraction-part * 10 + (char - ("0" -> Int))
+            fraction-divisor *= 10
+          else:
+            int-part = int-part * 10 + (char - ("0" -> Int))
+        else if char == ",":
+          in-fraction = true
+      sign * (int-part + fraction-part / fraction-divisor)
